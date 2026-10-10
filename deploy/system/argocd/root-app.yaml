@@ -6,8 +6,8 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: 'git@github:LeonLewiz/platform.git'
-    targetRevision: main
+    repoURL: 'git@github.com:LeonLewiz/platform.git'
+    targetRevision: 321bd8e
     path: deploy/system/argocd/apps
   destination:
     server: 'https://kubernetes.default.svc'
