@@ -1,16 +1,16 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: mood-detector-gitops
+  name: app-monitoring
   namespace: argocd
 spec:
   project: default
   source:
     repoURL: 'https://github.com/LeonLewiz/platform'
     targetRevision: HEAD
-    path: deploy/mood-app
+    path: deploy/system/monitoring
   destination:
-    server: 'https://default.svc'
+    server: 'https://kubernetes.default.svc'
     namespace: default
   syncPolicy:
     automated:

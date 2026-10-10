@@ -1,0 +1,15 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: mood-frontend-monitor
+  namespace: default
+  labels:
+    release: kube-prometheus
+spec:
+  selector:
+    matchLabels:
+      app: mood-frontend
+  endpoints:
+  - port: web 
+    path: /metrics
+    interval: 15s
