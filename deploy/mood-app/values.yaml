@@ -1,11 +1,9 @@
 analytics:
-  replicaCount: 1
   image:
     repository: leonlewiz/mood-analytics
     tag: latest
 
 frontend:
-  replicaCount: 1
   image:
     repository: leonlewiz/mood-frontend
     tag: latest
