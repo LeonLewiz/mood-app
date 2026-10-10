@@ -3,9 +3,14 @@ kind: Ingress
 metadata:
   name: mood-ingress
   annotations:
-    ingress.kubernetes.io/ssl-redirect: "false"
+    ingress.kubernetes.io/ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: "local-selfsigned-issuer"
     traefik.ingress.kubernetes.io/router.middlewares: default-test-rate-limit@kubernetescrd
 spec:
+  tls:
+  - hosts:
+    - mood.local
+    secretName: mood-local-tls-cert
   rules:
   - host: mood.local
     http:
