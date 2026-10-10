@@ -7,7 +7,7 @@ spec:
   project: default
   source:
     repoURL: 'https://github.com/LeonLewiz/platform'
-    targetRevision: HEAD
+    targetRevision: main
     path: deploy/system/monitoring
   destination:
     server: 'https://kubernetes.default.svc'
