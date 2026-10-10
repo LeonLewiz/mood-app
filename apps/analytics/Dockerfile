@@ -25,4 +25,4 @@ COPY . .
 
 EXPOSE 8001
 
-CMD ["python", "app.py"]
+ENTRYPOINT ["/app/app.py"]
