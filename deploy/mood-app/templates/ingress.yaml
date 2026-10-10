@@ -4,6 +4,7 @@ metadata:
   name: mood-ingress
   annotations:
     ingress.kubernetes.io/ssl-redirect: "false"
+    traefik.ingress.kubernetes.io/router.middlewares: default-test-rate-limit@kubeseal
 spec:
   rules:
   - host: mood.local
