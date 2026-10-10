@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: analytics
-        image: "{{ .Values.analytics.image.repository }}:{{ .Values.analytics.image.tag }}"
+        image: "{{ .Values.analytics.repository }}:{{ .Values.analytics.tag }}"
         ports:
         - containerPort: 8001
         resources:

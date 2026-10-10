@@ -1,9 +1,7 @@
 analytics:
-  image:
-    repository: leonlewiz/mood-analytics
-    tag: latest
+  repository: leonlewiz/mood-analytics
+  tag: latest
 
 frontend:
-  image:
-    repository: leonlewiz/mood-frontend
-    tag: latest
+  repository: leonlewiz/mood-frontend
+  tag: latest
