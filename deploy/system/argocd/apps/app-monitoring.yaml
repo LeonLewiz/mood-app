@@ -6,7 +6,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: 'https://github.com/LeonLewiz/platform'
+    repoURL: 'git@github.com:LeonLewiz/platform.git'
     targetRevision: main
     path: deploy/system/monitoring
   destination:
