@@ -25,7 +25,10 @@ spec:
         - name: REDIS_PORT
           value: "6379"
         - name: REDIS_PASSWORD
-          value: "TemporaryPasswordBeforeLockbox"
+          valueFrom:
+            secretKeyRef:
+              name: redis-production-secret
+              key: redis-password
         - name: ANALYTICS_SERVICE_URL
           value: "http://analytics-service:8001"
 ---
