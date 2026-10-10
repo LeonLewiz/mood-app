@@ -6,7 +6,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: 'https://github.com/LeonLewiz/platform'
+    repoURL: 'git@github:LeonLewiz/platform.git'
     targetRevision: HEAD
     path: deploy/system/argocd/apps
   destination:
