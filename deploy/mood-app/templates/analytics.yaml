@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mood-analytics
+spec:
+  replicas: {{ .Values.analytics.replicaCount }}
+  selector:
+    matchLabels:
+      app: mood-analytics
+  template:
+    metadata:
+      labels:
+        app: mood-analytics
+    spec:
+      containers:
+      - name: analytics
+        image: "{{ .Values.analytics.image.repository }}:{{ .Values.analytics.image.tag }}"
+        ports:
+        - containerPort: 8001
+        env:
+        - name: PORT
+          value: "8001"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: analytics-service
+spec:
+  ports:
+  - port: 8001
+    targetPort: 8001
+  selector:
+    app: mood-analytics
