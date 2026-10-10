@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: mood-analytics
 spec:
-  replicas: {{ .Values.analytics.replicaCount }}
+
   selector:
     matchLabels:
       app: mood-analytics
@@ -15,6 +15,25 @@ spec:
       containers:
       - name: analytics
         image: "{{ .Values.analytics.image.repository }}:{{ .Values.analytics.image.tag }}"
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "200m"
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8001
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 8001
+          initialDelaySeconds: 5
+          periodSeconds: 5
         ports:
         - containerPort: 8001
         env:
