@@ -1,0 +1,54 @@
+networks:
+  mood-network:
+    driver: bridge
+
+services:
+  redis:
+    image: redis:7.2-alpine
+    container_name: mood-redis
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    ports:
+      - "6379:6379"
+    networks:
+      - mood-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  analytics-service:
+    build:
+      context: ./analytics
+    container_name: mood-analytics
+    environment:
+      - PORT=8001
+    ports:
+      - "8001:8001"
+    networks:
+      - mood-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/healthz')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  frontend-service:
+    build:
+      context: ./frontend
+    container_name: mood-frontend
+    environment:
+      - PORT=8000
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - ANALYTICS_SERVICE_URL=http://analytics-service:8001
+    ports:
+      - "8000:8000"
+    networks:
+      - mood-network
+    depends_on:
+      redis:
+        condition: service_healthy
+      analytics-service:
+        condition: service_healthy
