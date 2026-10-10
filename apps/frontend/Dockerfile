@@ -6,16 +6,17 @@ WORKDIR /build
 RUN apt-get update && apt-get install -y --no-install-recommends gcc python3-dev && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
-# Install dependencies into .local dir
-RUN pip install --no-cache-dir --target=/install -r requirements.txt
+# Install dependencies
+RUN pip install --no-cache-dir --user -r requirements.txt
 # Stage 2: Final image
 FROM gcr.io/distroless/python3-debian12:nonroot AS final
 
 WORKDIR /app
 
 # Copy local libs
-COPY --from=builder /install /usr/local/lib/python3.11/site-packages
+COPY --from=builder /root/.local /home/nonroot/.local
 ENV PYTHONPATH=/usr/local/lib/python3.11/site-packages
+ENV PATH=/home/nonroot/.local/bin:$PATH
 
 
 COPY . .
