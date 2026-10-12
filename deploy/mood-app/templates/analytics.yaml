@@ -12,9 +12,20 @@ spec:
       labels:
         app: mood-analytics
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - name: analytics
         image: "{{ .Values.analytics.repository }}:{{ .Values.analytics.tag }}"
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop: ["ALL"]
         ports:
         - containerPort: 8001
         resources:

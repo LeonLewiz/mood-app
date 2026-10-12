@@ -11,9 +11,21 @@ spec:
       labels:
         app: mood-frontend
     spec:
+      # Запуск не от root. uid/gid берём у самого образа (appuser = 10001).
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - name: frontend
         image: "{{ .Values.frontend.repository }}:{{ .Values.frontend.tag }}"
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop: ["ALL"]
         ports:
         - containerPort: 8000
         resources:

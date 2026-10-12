@@ -12,9 +12,21 @@ spec:
       labels:
         app: mood-redis
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - name: redis
         image: redis:7.2-alpine
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop: ["ALL"]
         command: ["redis-server", "--requirepass", "$(REDIS_PASSWORD)"]
         env:
         - name: REDIS_PASSWORD
@@ -24,6 +36,12 @@ spec:
               key: redis-password
         ports:
         - containerPort: 6379
+        volumeMounts:
+        - name: data
+          mountPath: /data
+      volumes:
+      - name: data
+        emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
