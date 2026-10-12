@@ -112,13 +112,17 @@ root-app.yaml
      ▼
 root-platform-app
      │ смотрит на папку deploy/system/argocd/apps
-     │ и создаёт оттуда три дочерних приложения
+     │ и создаёт оттуда четыре дочерних приложения
      ▼
-┌──────────────────┬────────────────────┬─────────────────────┐
-│ mood-app         │ cloud-secrets      │ app-monitoring      │
-│ (deploy/mood-app)│ (external-secrets) │ (monitoring)        │
-│ приложение       │ секреты            │ метрики, TLS, Jaeger│
-└──────────────────┴────────────────────┴─────────────────────┘
+┌──────────────────────┬───────────────────────┐
+│ mood-app             │ cloud-secrets         │
+│ (deploy/mood-app)    │ (external-secrets)    │
+│ само приложение      │ секреты               │
+├──────────────────────┼───────────────────────┤
+│ app-monitoring       │ jaeger-operator       │
+│ (deploy/system/...)  │ (публичный helm-чарт) │
+│ метрики, TLS, Jaeger │ сам оператор Jaeger   │
+└──────────────────────┴───────────────────────┘
 ```
 
 Это паттерн **app-of-apps**: одно приложение создаёт остальные. Поэтому руками в кластер
@@ -132,8 +136,12 @@ kubectl get applications -n argocd
 ```
 
 Что должно быть **заранее** (ставится отдельно, не этим репозиторием): k3s, ArgoCD,
-Traefik, cert-manager, kube-prometheus-stack, External Secrets, Sealed Secrets и Jaeger Operator
-(с флагом `rbac.clusterRole=true`, иначе не увидит объекты).
+Traefik, cert-manager, kube-prometheus-stack, External Secrets и Sealed Secrets.
+
+А вот **оператор Jaeger ставить руками не нужно** - он тоже разворачивается из этого репозитория:
+приложение `jaeger-operator` берёт helm-чарт из публичного репозитория Jaeger и включает ему флаг
+`rbac.clusterRole=true`. Без этого флага оператор не видит объекты в других namespace, и Jaeger
+не поднимается - именно на этом я спотыкался.
 
 ---
 
@@ -150,7 +158,8 @@ Traefik, cert-manager, kube-prometheus-stack, External Secrets, Sealed Secrets �
 - Настроил сбор метрик (свои счётчики в коде)
 - Настроил секреты: External Secrets из Yandex Cloud Lockbox + Sealed Secrets.
 - Добавил HPA (автомасштабирование) и NetworkPolicy (какие сервисы видят друг друга).
-- Развернул трассировку Jaeger и подключил её к приложению.
+- Развернул трассировку Jaeger: и сам оператор Jaeger, и Jaeger управляются из git через ArgoCD
+  (helm-чарт + флаг `rbac.clusterRole=true`), а не ставятся руками.
 
 ---
 
@@ -210,7 +219,8 @@ platform/
 │       │   └── apps/
 │       │       ├── app-mood.yaml       # приложение
 │       │       ├── app-secrets.yaml    # секреты
-│       │       └── app-monitoring.yaml # метрики, TLS, Jaeger
+│       │       ├── app-monitoring.yaml # метрики, TLS, Jaeger
+│       │       └── app-jaeger-operator.yaml  # оператор Jaeger (публичный helm-чарт)
 │       ├── monitoring/
 │       │   ├── service-monitor.yaml   # Prometheus забирает /metrics
 │       │   ├── issuer.yaml            # самоподписанный центр сертификатов
