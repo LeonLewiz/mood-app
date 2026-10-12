@@ -56,7 +56,9 @@ metadata:
   name: frontend-service
 spec:
   ports:
-  - port: 8000
+  # Порт назван специально: ServiceMonitor ищет цель по имени порта.
+  - name: web
+    port: 8000
     targetPort: 8000
   selector:
     app: mood-frontend
