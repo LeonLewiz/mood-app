@@ -10,9 +10,7 @@ spec:
     chart: jaeger-operator
     targetRevision: "2.57.0"
     helm:
-      # ВАЖНО: clusterRole=true даёт оператору права на кластерные ресурсы
-      # (в т.ч. ingressclasses) и переводит его в режим "следить за всеми namespace".
-      # Без этого Jaeger CR в namespace default не поднимается.
+      # без clusterRole оператор не видит объекты в других namespace
       values: |
         rbac:
           clusterRole: true

@@ -112,7 +112,7 @@ root-app.yaml
      ▼
 root-platform-app
      │ смотрит на папку deploy/system/argocd/apps
-     │ и создаёт оттуда четыре дочерних приложения
+     │ и создаёт оттуда пять дочерних приложений
      ▼
 ┌──────────────────────┬───────────────────────┐
 │ mood-app             │ cloud-secrets         │
@@ -121,7 +121,11 @@ root-platform-app
 ├──────────────────────┼───────────────────────┤
 │ app-monitoring       │ jaeger-operator       │
 │ (deploy/system/...)  │ (публичный helm-чарт) │
-│ метрики, TLS, Jaeger │ сам оператор Jaeger   │
+│ метрики, TLS, Jaeger │ оператор Jaeger       │
+├──────────────────────┼───────────────────────┤
+│ platform             │                       │
+│ (system/platform)    │                       │
+│ pod security для ns  │                       │
 └──────────────────────┴───────────────────────┘
 ```
 
@@ -158,6 +162,11 @@ Traefik, cert-manager, kube-prometheus-stack, External Secrets и Sealed Secrets
 - Настроил сбор метрик (свои счётчики в коде)
 - Настроил секреты: External Secrets из Yandex Cloud Lockbox + Sealed Secrets.
 - Добавил HPA (автомасштабирование) и NetworkPolicy (какие сервисы видят друг друга).
+- Закрыл сеть по умолчанию: в namespace стоит `default-deny` на вход и выход, а разрешено
+  только нужное - DNS, Traefik и Prometheus внутрь приложения, приложение в аналитику и Redis.
+- Запустил все контейнеры не от root: `runAsNonRoot`, read-only корневая ФС, без capabilities,
+  плюс метки Pod Security Standards на namespace.
+- Подключил метрики Jaeger к Prometheus (отдельный ServiceMonitor).
 - Развернул трассировку Jaeger: и сам оператор Jaeger, и Jaeger управляются из git через ArgoCD
   (helm-чарт + флаг `rbac.clusterRole=true`), а не ставятся руками.
 
@@ -210,7 +219,9 @@ platform/
 │   │       ├── middleware-ratelimit.yaml
 │   │       ├── hpa-frontend.yaml      # автомасштабирование
 │   │       ├── hpa-analytics.yaml
-│   │       ├── network-policy-analytics.yaml   # кто кого видит
+│   │       ├── network-policy-default-deny.yaml  # запрет всего + DNS
+│   │       ├── network-policy-frontend.yaml      # кто кого видит
+│   │       ├── network-policy-analytics.yaml
 │   │       └── network-policy-redis.yaml
 │   │
 │   └── system/
@@ -220,11 +231,16 @@ platform/
 │       │       ├── app-mood.yaml       # приложение
 │       │       ├── app-secrets.yaml    # секреты
 │       │       ├── app-monitoring.yaml # метрики, TLS, Jaeger
+│       │       ├── app-platform.yaml   # pod security standards
 │       │       └── app-jaeger-operator.yaml  # оператор Jaeger (публичный helm-чарт)
 │       ├── monitoring/
-│       │   ├── service-monitor.yaml   # Prometheus забирает /metrics
-│       │   ├── issuer.yaml            # самоподписанный центр сертификатов
-│       │   └── jaeger.yaml            # трассировка
+│       │   ├── service-monitor.yaml          # Prometheus забирает /metrics
+│       │   ├── service-monitor-jaeger.yaml   # то же самое для Jaeger
+│       │   ├── network-policy-jaeger.yaml
+│       │   ├── issuer.yaml                   # самоподписанный центр сертификатов
+│       │   └── jaeger.yaml                   # трассировка
+│       ├── platform/
+│       │   └── namespace-default.yaml  # pod security standards
 │       └── external-secrets/
 │           ├── secret-store.yaml      # подключение к Yandex Cloud Lockbox
 │           ├── external-secret.yaml   # тянет пароль Redis
