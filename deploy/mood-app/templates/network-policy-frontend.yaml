@@ -1,0 +1,54 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: frontend-network-policy
+  namespace: {{ .Release.Namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      app: mood-frontend
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # 1. Вход от Traefik (ingress-контроллер живёт в kube-system).
+  #    Имя и порт: Traefik ходит в под напрямую по 8000.
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/name: traefik
+    ports:
+    - protocol: TCP
+      port: 8000
+  # 2. Скрейп метрик Prometheus (namespace monitoring, endpoint /metrics).
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: monitoring
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/name: prometheus
+    ports:
+    - protocol: TCP
+      port: 8000
+  egress:
+  # Вызов backend-сервиса аналитики
+  - to:
+    - podSelector:
+        matchLabels:
+          app: mood-analytics
+    ports:
+    - protocol: TCP
+      port: 8001
+  # Запись истории в Redis
+  - to:
+    - podSelector:
+        matchLabels:
+          app: mood-redis
+    ports:
+    - protocol: TCP
+      port: 6379
+  # DNS разрешён общей политикой mood-allow-dns
