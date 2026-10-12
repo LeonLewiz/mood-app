@@ -12,6 +12,13 @@ spec:
   destination:
     server: 'https://kubernetes.default.svc'
     namespace: default
+  # Оператор Jaeger дописывает в CR свою метку, из-за этого ArgoCD показывал
+  # вечный OutOfSync. Игнорируем поля, которыми владеет оператор.
+  ignoreDifferences:
+  - group: jaegertracing.io
+    kind: Jaeger
+    managedFieldsManagers:
+    - jaeger-operator
   syncPolicy:
     automated:
       prune: true
