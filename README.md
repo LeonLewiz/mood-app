@@ -44,7 +44,8 @@
 - **ArgoCD** - GitOps. Следит за этим репозиторием и сам применяет изменения в кластере.
 - **Traefik** - вход в кластер (ingress). Принимает запросы снаружи и решает, куда их отправить.
 - **cert-manager** - сам выпускает TLS-сертификаты, чтобы было HTTPS.
-- **Prometheus + Grafana** (kube-prometheus-stack) - сбор и показ метрик.
+- **Prometheus + Grafana + Alertmanager** (kube-prometheus-stack) - сбор метрик, графики
+  и уведомления об алертах.
 - **Jaeger** - трассировка: показывает путь одного запроса через все сервисы и где он тормозит.
 - **External Secrets / Sealed Secrets** - секреты (пароли) не лежат в git открытым текстом.
 - **HPA** - автомасштабирование: если нагрузка растёт, Kubernetes добавляет копии приложения.
@@ -112,7 +113,7 @@ root-app.yaml
      ▼
 root-platform-app
      │ смотрит на папку deploy/system/argocd/apps
-     │ и создаёт оттуда пять дочерних приложений
+     │ и создаёт оттуда шесть дочерних приложений
      ▼
 ┌──────────────────────┬───────────────────────┐
 │ mood-app             │ cloud-secrets         │
@@ -123,9 +124,9 @@ root-platform-app
 │ (deploy/system/...)  │ (публичный helm-чарт) │
 │ метрики, TLS, Jaeger │ оператор Jaeger       │
 ├──────────────────────┼───────────────────────┤
-│ platform             │                       │
-│ (system/platform)    │                       │
-│ pod security для ns  │                       │
+│ platform             │ app-kube-prometheus   │
+│ (system/platform)    │ (values в git + чарт) │
+│ pod security для ns  │ мониторинг из git     │
 └──────────────────────┴───────────────────────┘
 ```
 
@@ -140,12 +141,70 @@ kubectl get applications -n argocd
 ```
 
 Что должно быть **заранее** (ставится отдельно, не этим репозиторием): k3s, ArgoCD,
-Traefik, cert-manager, kube-prometheus-stack, External Secrets и Sealed Secrets.
+Traefik, cert-manager, External Secrets и Sealed Secrets. Мониторинг в этот список
+больше не входит - он тоже ставится отсюда, см. раздел ниже.
 
 А вот **оператор Jaeger ставить руками не нужно** - он тоже разворачивается из этого репозитория:
 приложение `jaeger-operator` берёт helm-чарт из публичного репозитория Jaeger и включает ему флаг
 `rbac.clusterRole=true`. Без этого флага оператор не видит объекты в других namespace, и Jaeger
 не поднимается - именно на этом я спотыкался.
+
+### Мониторинг и алерты: тоже из git
+
+Раньше kube-prometheus-stack стоял в кластере, поставленный руками через `helm install`.
+Теперь его ставит ArgoCD приложением `app-kube-prometheus`, а версия чарта пинована:
+обновление мониторинга - отдельный коммит, а не то, что прилетело само.
+
+- `deploy/system/argocd/apps/app-kube-prometheus.yaml` - само приложение: версия чарта
+  `92.3.0`, имя релиза `kube-prometheus` (от него зависят имена всех объектов) и два
+  источника: значения из этого репозитория плюс чарт из helm-репозитория.
+- `deploy/system/kube-prometheus/values.yaml` - значения: хранилище для Prometheus и
+  Alertmanager, пароль Grafana, внешние адреса UI.
+- `deploy/system/monitoring/` - то, чего в чарте нет: ServiceMonitor'ы, Ingress'ы,
+  маршрутизация алертов, сетевые политики.
+
+Три грабли, на которые я наступил:
+
+1. Чарт генерирует пароль администратора Grafana случайно при каждом рендере. ArgoCD видел бы
+   вечный `OutOfSync`, а под Grafana перезапускался бы на каждом синке. Пароль пришлось вынести
+   в SealedSecret и сказать чарту `existingSecret`.
+2. В StatefulSet нельзя дописать том на месте: Kubernetes запрещает менять
+   `volumeClaimTemplates` у существующего объекта. Оператор сам пересоздаёт StatefulSet, поды
+   перезапускаются один раз.
+3. У Prometheus в значениях чарта поле называется `storageSpec`, а в самом объекте Prometheus
+   оно превращается в `storage`. Напишешь `storage` - чарт молча проигнорирует, и тома не будет.
+
+Проверить, что всё сошлось:
+
+```bash
+kubectl get application -n argocd app-kube-prometheus   # должно быть Synced
+kubectl get pvc -n monitoring                           # тома Prometheus и Alertmanager
+kubectl get alertmanagerconfig -n monitoring            # правила доставки алертов
+```
+
+Проверить, что уведомления реально доходят, не дожидаясь настоящего алерта: открываем доступ
+к API Alertmanager и отправляем в него тестовый алерт.
+
+```bash
+kubectl port-forward -n monitoring svc/kube-prometheus-kube-prome-alertmanager 9093:9093
+```
+
+```bash
+curl -X POST -H 'Content-Type: application/json' \
+  -d '[{"labels":{"alertname":"Проверка","severity":"warning","namespace":"monitoring"}}]' \
+  http://localhost:9093/api/v2/alerts
+```
+
+Через полминуты (это `group_wait`) уведомление появится в логе приёмника:
+
+```bash
+kubectl logs -n monitoring deploy/alert-sink
+```
+
+Приёмник `alert-sink` демонстрационный: он просто печатает всё, что ему прислали. Под настоящие
+уведомления меняется только `url` получателя в
+`deploy/system/monitoring/alertmanager-config.yaml` (Telegram, Slack, PagerDuty), после чего
+демо-приёмник можно удалить.
 
 ---
 
@@ -169,6 +228,16 @@ Traefik, cert-manager, kube-prometheus-stack, External Secrets и Sealed Secrets
 - Подключил метрики Jaeger к Prometheus (отдельный ServiceMonitor).
 - Развернул трассировку Jaeger: и сам оператор Jaeger, и Jaeger управляются из git через ArgoCD
   (helm-чарт + флаг `rbac.clusterRole=true`), а не ставятся руками.
+- Перевёл мониторинг под GitOps: kube-prometheus-stack ставится ArgoCD из публичного чарта
+  с пинованной версией, а значения лежат в репозитории.
+- Включил постоянное хранилище: Prometheus 10Gi, Alertmanager 2Gi. До этого метрики и
+  silences терялись при каждом перезапуске пода.
+- Настроил маршрутизацию алертов (`AlertmanagerConfig`) и проверил доставку живьём через
+  отдельный приёмник.
+- Вывел Alertmanager и Grafana наружу через Traefik с сертификатами от cert-manager.
+- Закрыл сеть и в monitoring: `default-deny` плюс разрешения только на нужные потоки
+  (Prometheus скрейпит кластер, Grafana и Alertmanager ходят только к своим датасорсам
+  и приёмнику уведомлений).
 
 ---
 
@@ -188,7 +257,7 @@ Traefik, cert-manager, kube-prometheus-stack, External Secrets и Sealed Secrets
 - Приложения пока не отправляют трейсы автоматически - нужно добавить OpenTelemetry.
 - Образы пока в публичном Docker Hub; можно перейти на yandex container registry со сканированием уязвимостей.
 - Добавить тесты и проверку кода в CI.
-- Алерты в Alertmanager.
+- Реальный получатель уведомлений (Telegram или Slack) вместо демо-приёмника `alert-sink`.
 
 ---
 
@@ -232,11 +301,20 @@ platform/
 │       │       ├── app-secrets.yaml    # секреты
 │       │       ├── app-monitoring.yaml # метрики, TLS, Jaeger
 │       │       ├── app-platform.yaml   # pod security standards
+│       │       ├── app-kube-prometheus.yaml  # мониторинг (пинованная версия чарта)
+│       │       ├── repo-prometheus-community.yaml  # подключение helm-репозитория
 │       │       └── app-jaeger-operator.yaml  # оператор Jaeger (публичный helm-чарт)
+│       ├── kube-prometheus/
+│       │   └── values.yaml            # значения чарта мониторинга
 │       ├── monitoring/
 │       │   ├── service-monitor.yaml          # Prometheus забирает /metrics
 │       │   ├── service-monitor-jaeger.yaml   # то же самое для Jaeger
+│       │   ├── alertmanager-config.yaml      # куда отправлять алерты
+│       │   ├── alert-sink.yaml               # демо-приёмник уведомлений
+│       │   ├── ingress.yaml                  # UI Alertmanager и Grafana по HTTPS
+│       │   ├── network-policy-monitoring.yaml # кто кого видит в monitoring
 │       │   ├── network-policy-jaeger.yaml
+│       │   ├── grafana-admin-sealed-secret.yaml # пароль Grafana
 │       │   ├── issuer.yaml                   # самоподписанный центр сертификатов
 │       │   └── jaeger.yaml                   # трассировка
 │       ├── platform/
