@@ -1,0 +1,297 @@
+# Сетевые политики для namespace monitoring. Логика та же, что в deploy/mood-app:
+# сначала запрещаем всё, потом разрешаем только нужные направления.
+#
+# Важное отличие от mood-app: Prometheus по своей природе ходит во все стороны,
+# он скрейпит весь кластер, поэтому ему разрешены поды всех namespace.
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: monitoring-default-deny
+  namespace: monitoring
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress: []
+  egress: []
+---
+# Разрешаем всем подам namespace ходить в DNS (CoreDNS в kube-system).
+# БЕЗ ЭТОГО ПРАВИЛА ВСЁ ЛОМАЕТСЯ
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: monitoring-allow-dns
+  namespace: monitoring
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+# Prometheus: вход только от Grafana и от самого себя (он скрейпит и себя),
+# выход куда угодно на порты скрейпа.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: prometheus
+  namespace: monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: prometheus
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: grafana
+      ports:
+        - protocol: TCP
+          port: 9090
+    # Сам скрейпит себя ещё и по служебному порту reloader
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+      ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    # Цели скрейпа: поды любого namespace
+    - to:
+        - namespaceSelector: {}
+    # Узел: kubelet, apiserver и node-exporter живут на самом узле, вне pod-сети
+    - ports:
+        - protocol: TCP
+          port: 6443
+        - protocol: TCP
+          port: 10250
+        - protocol: TCP
+          port: 9100
+    # API кластера: нужен для поиска целей и записи правил
+    - to:
+        - ipBlock:
+            cidr: 10.43.0.1/32
+      ports:
+        - protocol: TCP
+          port: 443
+---
+# Alertmanager: вход от Prometheus (алерты) и от Traefik (UI),
+# выход только к приёмнику уведомлений.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: alertmanager
+  namespace: monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: alertmanager
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Prometheus присылает алерты, а ещё скрейпит метрики самого Alertmanager
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+      ports:
+        - protocol: TCP
+          port: 9093
+        - protocol: TCP
+          port: 8080
+    # UI наружу через Traefik
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: traefik
+      ports:
+        - protocol: TCP
+          port: 9093
+    # Порт межузловой синхронизации. Реплика пока одна, правило на будущее
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: alertmanager
+      ports:
+        - protocol: TCP
+          port: 9094
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: alert-sink
+      ports:
+        - protocol: TCP
+          port: 8080
+---
+# Grafana: вход от Traefik (UI) и от Prometheus (он скрейпит её метрики),
+# выход к датасорсам Prometheus и Alertmanager.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: grafana
+  namespace: monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: grafana
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: traefik
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+      ports:
+        - protocol: TCP
+          port: 3000
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+      ports:
+        - protocol: TCP
+          port: 9090
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: alertmanager
+      ports:
+        - protocol: TCP
+          port: 9093
+---
+# Демо-приёмник уведомлений: принимает только от Alertmanager.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: alert-sink
+  namespace: monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app: alert-sink
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: alertmanager
+      ports:
+        - protocol: TCP
+          port: 8080
+---
+# kube-state-metrics отдаёт метрики Prometheus, а сам читает объекты через API
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: kube-state-metrics
+  namespace: monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: kube-state-metrics
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+      ports:
+        - protocol: TCP
+          port: 8080
+        - protocol: TCP
+          port: 8081
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 10.43.0.1/32
+      ports:
+        - protocol: TCP
+          port: 443
+---
+# node-exporter работает в сети узла (hostNetwork), поэтому адрес у него не из
+# pod-сети. Разрешаем скрейп от Prometheus.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: node-exporter
+  namespace: monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: prometheus-node-exporter
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+      ports:
+        - protocol: TCP
+          port: 9100
+---
+# Оператору нужен API кластера: он следит за объектами мониторинга.
+# А к нему стучится API-сервер: вызывает webhook и ходит за метриками через
+# kubelet. API-сервер живёт на узле, вне pod-сети, поэтому источник тут не
+# выбрать по метке.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: prometheus-operator
+  namespace: monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: kube-prometheus-stack-prometheus-operator
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - ports:
+        - protocol: TCP
+          port: 8443
+        - protocol: TCP
+          port: 10250
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 10.43.0.1/32
+      ports:
+        - protocol: TCP
+          port: 443
