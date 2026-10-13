@@ -17,3 +17,24 @@ grafana:
     # вечный OutOfSync, а под Grafana перезапускался бы на каждом синке.
     # Пароль лежит в SealedSecret (grafana-admin-sealed-secret.yaml).
     existingSecret: grafana-admin
+
+alertmanager:
+  alertmanagerSpec:
+    # Без хранилища Alertmanager держит silences и историю отправленных
+    # уведомлений только в памяти пода: рестарт — и они пропали.
+    # StorageClass не указываем, подставится дефолтный (в k3s это local-path).
+    storage:
+      volumeClaimTemplate:
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 2Gi
+    # Лимиты, чтобы Alertmanager не съел память соседей на одном узле
+    resources:
+      requests:
+        cpu: 50m
+        memory: 100Mi
+      limits:
+        memory: 256Mi
