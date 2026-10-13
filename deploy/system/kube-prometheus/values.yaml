@@ -1,0 +1,12 @@
+# Значения для чарта kube-prometheus-stack.
+# Версия чарта пинована в deploy/system/argocd/apps/app-kube-prometheus.yaml.
+#
+# Лежит вне путей, которые тянут Application'ы: ArgoCD разбирает любой .yaml из
+# своей папки как манифест кластера, и этот файл сломал бы app-monitoring.
+
+prometheus:
+  prometheusSpec:
+    # Иначе селекторы ServiceMonitor/PodMonitor ограничены меткой релиза Helm
+    # (release: kube-prometheus), и наши service-monitor*.yaml не скрейпятся.
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
