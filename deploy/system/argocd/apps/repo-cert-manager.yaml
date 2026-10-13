@@ -1,0 +1,14 @@
+# Регистрация helm-репы cert-manager в ArgoCD.
+# Сам чарт теперь ставится из репозитория, а не руками с ноутбука.
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: repo-cert-manager
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: repository
+stringData:
+  name: jetstack
+  type: helm
+  url: https://charts.jetstack.io
