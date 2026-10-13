@@ -1,0 +1,28 @@
+# Маршрутизация алертов Alertmanager. Сам Alertmanager объект создаёт чарт
+# kube-prometheus-stack, а правила доставки живут здесь отдельным объектом:
+# у Alertmanager селекторы пустые, поэтому он подхватывает любой
+# AlertmanagerConfig в своём namespace.
+
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: AlertmanagerConfig
+metadata:
+  name: mood-alerts
+  namespace: monitoring
+spec:
+  route:
+    receiver: alert-sink
+    # Группировка: алерты с одинаковым alertname и namespace уезжают одним
+    # сообщением, а не по одному на каждый под.
+    groupBy:
+      - alertname
+      - namespace
+    groupWait: 30s
+    groupInterval: 5m
+    # Пока алерт горит, повторяем не чаще раза в 4 часа
+    repeatInterval: 4h
+  receivers:
+    - name: alert-sink
+      webhookConfigs:
+        - url: http://alert-sink.monitoring.svc.cluster.local:8080/alerts
+          # Присылать и уведомление о том, что алерт прошёл
+          sendResolved: true
