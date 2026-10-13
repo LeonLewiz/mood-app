@@ -27,9 +27,18 @@ grafana:
     # вечный OutOfSync, а под Grafana перезапускался бы на каждом синке.
     # Пароль лежит в SealedSecret (grafana-admin-sealed-secret.yaml).
     existingSecret: grafana-admin
+  # Ключ называется буквально grafana.ini, поэтому получается grafana.grafana.ini:
+  # так устроен вложенный чарт Grafana внутри kube-prometheus-stack.
+  grafana.ini:
+    server:
+      # Чтобы ссылки и редиректы внутри Grafana вели на внешний адрес, а не на
+      # внутренний сервис
+      root_url: https://grafana.mood.local
 
 alertmanager:
   alertmanagerSpec:
+    # То же для Alertmanager: этот адрес он подставляет в уведомления
+    externalUrl: https://alertmanager.mood.local
     # Том под silences и историю уведомлений, иначе они теряются при рестарте.
     # StorageClass не указываем, подставится дефолтный (в k3s local-path).
     storage:
