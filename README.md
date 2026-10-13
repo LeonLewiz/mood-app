@@ -198,13 +198,17 @@ curl -X POST -H 'Content-Type: application/json' \
 Через полминуты (это `group_wait`) уведомление появится в логе приёмника:
 
 ```bash
-kubectl logs -n monitoring deploy/alert-sink
+kubectl -n monitoring get secret telegram-bot -o jsonpath='{.data.bot-token}' >/dev/null && echo "bot token на месте"
 ```
 
-Приёмник `alert-sink` демонстрационный: он просто печатает всё, что ему прислали. Под настоящие
-уведомления меняется только `url` получателя в
-`deploy/system/monitoring/alertmanager-config.yaml` (Telegram, Slack, PagerDuty), после чего
-демо-приёмник можно удалить.
+Уведомления уходят в **Telegram**: получатель `telegram` в
+`deploy/system/monitoring/alertmanager-config.yaml` берёт токен бота из Secret, а не из
+репозитория (сам токен зашифрован в `telegram-bot-sealed-secret.yaml`). Проверить канал можно
+тем же тестовым алертом: сообщение должно прийти в чат. Цифры доставки видны в Prometheus:
+
+```bash
+curl -s 'http://localhost:9090/api/v1/query?query=alertmanager_notifications_total{integration="telegram"}' | jq .
+```
 
 ---
 
@@ -232,8 +236,8 @@ kubectl logs -n monitoring deploy/alert-sink
   с пинованной версией, а значения лежат в репозитории.
 - Включил постоянное хранилище: Prometheus 10Gi, Alertmanager 2Gi. До этого метрики и
   silences терялись при каждом перезапуске пода.
-- Настроил маршрутизацию алертов (`AlertmanagerConfig`) и проверил доставку живьём через
-  отдельный приёмник.
+- Настроил маршрутизацию алертов (`AlertmanagerConfig`) и доставку в Telegram: токен бота
+  лежит в SealedSecret, а не в репозитории, и доставку я проверил тестовым алертом.
 - Вывел Alertmanager и Grafana наружу через Traefik с сертификатами от cert-manager.
 - Закрыл сеть и в monitoring: `default-deny` плюс разрешения только на нужные потоки
   (Prometheus скрейпит кластер, Grafana и Alertmanager ходят только к своим датасорсам
@@ -257,7 +261,7 @@ kubectl logs -n monitoring deploy/alert-sink
 - Приложения пока не отправляют трейсы автоматически - нужно добавить OpenTelemetry.
 - Образы пока в публичном Docker Hub; можно перейти на yandex container registry со сканированием уязвимостей.
 - Добавить тесты и проверку кода в CI.
-- Реальный получатель уведомлений (Telegram или Slack) вместо демо-приёмника `alert-sink`.
+- Добавить получателей на разные каналы: сейчас всё уходит в один чат Telegram.
 
 ---
 
@@ -310,7 +314,7 @@ platform/
 │       │   ├── service-monitor.yaml          # Prometheus забирает /metrics
 │       │   ├── service-monitor-jaeger.yaml   # то же самое для Jaeger
 │       │   ├── alertmanager-config.yaml      # куда отправлять алерты
-│       │   ├── alert-sink.yaml               # демо-приёмник уведомлений
+│       │   ├── telegram-bot-sealed-secret.yaml # токен бота Telegram
 │       │   ├── ingress.yaml                  # UI Alertmanager и Grafana по HTTPS
 │       │   ├── network-policy-monitoring.yaml # кто кого видит в monitoring
 │       │   ├── network-policy-jaeger.yaml

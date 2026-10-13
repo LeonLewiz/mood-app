@@ -10,7 +10,7 @@ metadata:
   namespace: monitoring
 spec:
   route:
-    receiver: alert-sink
+    receiver: telegram
     # Группировка: алерты с одинаковым alertname и namespace уезжают одним
     # сообщением, а не по одному на каждый под.
     groupBy:
@@ -21,8 +21,13 @@ spec:
     # Пока алерт горит, повторяем не чаще раза в 4 часа
     repeatInterval: 4h
   receivers:
-    - name: alert-sink
-      webhookConfigs:
-        - url: http://alert-sink.monitoring.svc.cluster.local:8080/alerts
+    - name: telegram
+      telegramConfigs:
+        # Токен бота берётся из Secret, а не из этого файла: в репозитории он
+        # лежит зашифрованным (telegram-bot-sealed-secret.yaml).
+        - botToken:
+            name: telegram-bot
+            key: bot-token
+          chatID: 5534301096
           # Присылать и уведомление о том, что алерт прошёл
           sendResolved: true

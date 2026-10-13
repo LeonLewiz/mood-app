@@ -140,13 +140,17 @@ spec:
         - protocol: TCP
           port: 9094
   egress:
+    # Уведомления уходят в Telegram, то есть наружу. Разрешаем выход в интернет
+    # на 443, но не внутрь кластера: адреса подов и сервисов исключены.
     - to:
-        - podSelector:
-            matchLabels:
-              app: alert-sink
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.42.0.0/16
+              - 10.43.0.0/16
       ports:
         - protocol: TCP
-          port: 8080
+          port: 443
 ---
 # Grafana: вход от Traefik (UI) и от Prometheus (он скрейпит её метрики),
 # выход к датасорсам Prometheus и Alertmanager.
@@ -191,27 +195,6 @@ spec:
       ports:
         - protocol: TCP
           port: 9093
----
-# Демо-приёмник уведомлений: принимает только от Alertmanager.
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: alert-sink
-  namespace: monitoring
-spec:
-  podSelector:
-    matchLabels:
-      app: alert-sink
-  policyTypes:
-    - Ingress
-  ingress:
-    - from:
-        - podSelector:
-            matchLabels:
-              app.kubernetes.io/name: alertmanager
-      ports:
-        - protocol: TCP
-          port: 8080
 ---
 # kube-state-metrics отдаёт метрики Prometheus, а сам читает объекты через API
 apiVersion: networking.k8s.io/v1
