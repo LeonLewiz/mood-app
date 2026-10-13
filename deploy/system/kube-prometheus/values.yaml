@@ -10,6 +10,19 @@ prometheus:
     # (release: kube-prometheus), и наши service-monitor*.yaml не скрейпятся.
     serviceMonitorSelectorNilUsesHelmValues: false
     podMonitorSelectorNilUsesHelmValues: false
+    # История метрик тоже живёт в томе: живое хранилище — это единственный
+    # способ пережить рестарт пода без дыр на графиках.
+    # Внимание: в values чарта поле называется storageSpec, хотя в самом
+    # объекте Prometheus оно превращается в storage. У Alertmanager и в values,
+    # и в объекте — просто storage.
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 10Gi
 
 grafana:
   admin:
