@@ -10,3 +10,10 @@ prometheus:
     # (release: kube-prometheus), и наши service-monitor*.yaml не скрейпятся.
     serviceMonitorSelectorNilUsesHelmValues: false
     podMonitorSelectorNilUsesHelmValues: false
+
+grafana:
+  admin:
+    # Пароль админа чарт генерирует случайно при каждом рендере: ArgoCD видел бы
+    # вечный OutOfSync, а под Grafana перезапускался бы на каждом синке.
+    # Пароль лежит в SealedSecret (grafana-admin-sealed-secret.yaml).
+    existingSecret: grafana-admin
