@@ -1,8 +1,7 @@
 # Значения для чарта kube-prometheus-stack.
 # Версия чарта пинована в deploy/system/argocd/apps/app-kube-prometheus.yaml.
-#
-# Лежит вне путей, которые тянут Application'ы: ArgoCD разбирает любой .yaml из
-# своей папки как манифест кластера, и этот файл сломал бы app-monitoring.
+# Лежит вне путей Application'ов: ArgoCD разбирает любой .yaml из своей папки
+# как манифест кластера, и этот файл сломал бы app-monitoring.
 
 prometheus:
   prometheusSpec:
@@ -10,11 +9,9 @@ prometheus:
     # (release: kube-prometheus), и наши service-monitor*.yaml не скрейпятся.
     serviceMonitorSelectorNilUsesHelmValues: false
     podMonitorSelectorNilUsesHelmValues: false
-    # История метрик тоже живёт в томе: живое хранилище — это единственный
-    # способ пережить рестарт пода без дыр на графиках.
-    # Внимание: в values чарта поле называется storageSpec, хотя в самом
-    # объекте Prometheus оно превращается в storage. У Alertmanager и в values,
-    # и в объекте — просто storage.
+    # Том под метрики, иначе история теряется при рестарте пода.
+    # В values чарта поле зовётся storageSpec, а в объекте Prometheus становится
+    # storage. У Alertmanager и там, и там storage.
     storageSpec:
       volumeClaimTemplate:
         spec:
@@ -33,9 +30,8 @@ grafana:
 
 alertmanager:
   alertmanagerSpec:
-    # Без хранилища Alertmanager держит silences и историю отправленных
-    # уведомлений только в памяти пода: рестарт — и они пропали.
-    # StorageClass не указываем, подставится дефолтный (в k3s это local-path).
+    # Том под silences и историю уведомлений, иначе они теряются при рестарте.
+    # StorageClass не указываем, подставится дефолтный (в k3s local-path).
     storage:
       volumeClaimTemplate:
         spec:
@@ -44,7 +40,7 @@ alertmanager:
           resources:
             requests:
               storage: 2Gi
-    # Лимиты, чтобы Alertmanager не съел память соседей на одном узле
+    # Лимиты, чтобы не съел память соседей
     resources:
       requests:
         cpu: 50m

@@ -1,8 +1,7 @@
-# Регистрация helm-репы prometheus-community в ArgoCD.
-# ArgoCD не видит helm-репы с ноутбука, у него свои подключения к источникам.
-# Поэтому описываем её декларативно и кладём рядом с Application'ами — создаст root-app,
-# а не команда argocd repo add руками.
+# Helm-репа prometheus-community для ArgoCD.
+# С ноутбука helm её видит, а ArgoCD нет: у него свои подключения к источникам.
 # Репа публичная, креденшелы не нужны.
+# Лежит рядом с Application'ами, чтобы создавал её root-app, а не argocd repo add.
 
 apiVersion: v1
 kind: Secret

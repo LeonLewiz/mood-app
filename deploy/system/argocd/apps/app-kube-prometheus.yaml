@@ -6,18 +6,18 @@ metadata:
 spec:
   project: default
   sources:
-    # 1. Наш репозиторий — только источник значений, ref: values
-    #    даёт на них ссылку вида $values/<путь от корня репы>.
+    # 1. Наш репозиторий только как источник значений, ref: values даёт ссылку
+    #    на них вида $values/<путь от корня репы>.
     - repoURL: 'git@github.com:LeonLewiz/platform.git'
       targetRevision: main
       ref: values
-    # 2. Чарт из helm-репы. targetRevision — версия чарта, не ветка:
-    #    обновление мониторинга должно быть отдельным осознанным коммитом.
+    # 2. Чарт из helm-репы. targetRevision это версия чарта, не ветка, чтобы
+    #    обновление мониторинга было отдельным коммитом.
     - repoURL: 'https://prometheus-community.github.io/helm-charts'
       chart: kube-prometheus-stack
       targetRevision: 92.3.0
       helm:
-        # Имя релиза задаёт имена всех объектов (kube-prometheus-*), поэтому оно
+        # Имя релиза задаёт имена всех объектов (kube-prometheus-*), поэтому
         # совпадает с релизом, который стоял в кластере до переезда в GitOps.
         releaseName: kube-prometheus
         valueFiles:
@@ -30,7 +30,7 @@ spec:
       prune: true
       selfHeal: true
     syncOptions:
-      # Namespace monitoring тоже создаётся здесь, отдельного манифеста не нужно.
+      # Namespace monitoring создаёт сам ArgoCD
       - CreateNamespace=true
       # CRD мониторинга не влезают в client-side apply (лимит аннотации
       # last-applied-configuration), поэтому применяем server-side.
