@@ -37,6 +37,12 @@ grafana:
   admin:
     # пароль админа Grafana: чарт генерирует его случайно, поэтому лежит в SealedSecret
     existingSecret: grafana-admin
+  # датасорс для трасс, сам Tempo ставится приложением app-tempo.yaml
+  additionalDataSources:
+    - name: Tempo
+      type: tempo
+      url: http://tempo.monitoring:3200
+      access: proxy
   # Ключ называется буквально grafana.ini, поэтому получается grafana.grafana.ini:
   # так устроен вложенный чарт Grafana внутри kube-prometheus-stack.
   grafana.ini:

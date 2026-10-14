@@ -51,4 +51,19 @@ spec:
     ports:
     - protocol: TCP
       port: 6379
+  # Отправка трасс в Tempo (namespace monitoring)
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: monitoring
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/name: tempo
+    ports:
+    - protocol: TCP
+      port: 4317
+    - protocol: TCP
+      port: 4318
+    - protocol: TCP
+      port: 14268
   # DNS разрешён общей политикой mood-allow-dns

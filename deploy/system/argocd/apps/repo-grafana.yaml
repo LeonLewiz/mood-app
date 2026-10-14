@@ -1,0 +1,13 @@
+# helm-репа grafana для ArgoCD: репы с ноутбука он не видит, у него свои подключения
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: repo-grafana
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: repository
+stringData:
+  name: grafana
+  type: helm
+  url: https://grafana.github.io/helm-charts

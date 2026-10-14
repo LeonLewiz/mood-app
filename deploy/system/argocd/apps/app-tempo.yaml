@@ -1,0 +1,30 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app-tempo
+  namespace: argocd
+spec:
+  project: default
+  sources:
+    # наш репозиторий только как источник значений, ref: values даёт ссылку вида $values/<путь>
+    - repoURL: 'git@github.com:LeonLewiz/platform.git'
+      targetRevision: main
+      ref: values
+    # 2. Чарт Tempo из helm-репы grafana, версия зафиксирована.
+    - repoURL: 'https://grafana.github.io/helm-charts'
+      chart: tempo
+      targetRevision: 1.24.4
+      helm:
+        releaseName: tempo
+        valueFiles:
+          - $values/deploy/system/helm/tempo.yaml
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
