@@ -1,7 +1,21 @@
-# Значения для чарта kube-prometheus-stack.
-# Версия чарта пинована в deploy/system/argocd/apps/app-kube-prometheus.yaml.
-# Лежит вне путей Application'ов: ArgoCD разбирает любой .yaml из своей папки
-# как манифест кластера, и этот файл сломал бы app-monitoring.
+# значения чарта kube-prometheus-stack, версия пинована в app-kube-prometheus.yaml, файл лежит вне путей Application'ов
+
+# В k3s этих компонентов нет отдельными подами, метрик для них не существует
+defaultRules:
+  rules:
+    etcd: false
+    kubeControllerManager: false
+    kubeScheduler: false
+    kubeProxy: false
+
+kubeEtcd:
+  enabled: false
+kubeControllerManager:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeProxy:
+  enabled: false
 
 prometheus:
   prometheusSpec:
@@ -9,9 +23,7 @@ prometheus:
     # (release: kube-prometheus), и наши service-monitor*.yaml не скрейпятся.
     serviceMonitorSelectorNilUsesHelmValues: false
     podMonitorSelectorNilUsesHelmValues: false
-    # Том под метрики, иначе история теряется при рестарте пода.
-    # В values чарта поле зовётся storageSpec, а в объекте Prometheus становится
-    # storage. У Alertmanager и там, и там storage.
+    # том под метрики, иначе история теряется при рестарте пода (в чарте поле storageSpec, в объекте storage)
     storageSpec:
       volumeClaimTemplate:
         spec:
@@ -23,9 +35,7 @@ prometheus:
 
 grafana:
   admin:
-    # Пароль админа чарт генерирует случайно при каждом рендере: ArgoCD видел бы
-    # вечный OutOfSync, а под Grafana перезапускался бы на каждом синке.
-    # Пароль лежит в SealedSecret (grafana-admin-sealed-secret.yaml).
+    # пароль админа Grafana: чарт генерирует его случайно, поэтому лежит в SealedSecret
     existingSecret: grafana-admin
   # Ключ называется буквально grafana.ini, поэтому получается grafana.grafana.ini:
   # так устроен вложенный чарт Grafana внутри kube-prometheus-stack.
