@@ -10,7 +10,7 @@ spec:
     - repoURL: 'git@github.com:LeonLewiz/platform.git'
       targetRevision: main
       ref: values
-    # 2. Чарт Tempo из helm-репы grafana, версия зафиксирована.
+    # чарт Tempo из helm-репы grafana, версия зафиксирована
     - repoURL: 'https://grafana.github.io/helm-charts'
       chart: tempo
       targetRevision: 1.24.4
