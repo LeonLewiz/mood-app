@@ -1,9 +1,7 @@
 # значения чарта grafana/tempo, версия чарта зафиксирована в app-tempo.yaml
 
 tempo:
-  # сколько хранить трассы
   retention: 72h
-  # лимит по памяти, чтобы Tempo не съел память ноутбука
   resources:
     requests:
       cpu: 100m
@@ -17,6 +15,5 @@ persistence:
   storageClassName: local-path
   size: 5Gi
 
-# метрики Tempo в Prometheus
 serviceMonitor:
   enabled: true
