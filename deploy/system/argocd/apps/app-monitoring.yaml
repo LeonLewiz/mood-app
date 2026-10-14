@@ -4,10 +4,7 @@ metadata:
   name: app-monitoring
   namespace: argocd
   annotations:
-    # CRD Jaeger подставляет в spec много значений по умолчанию (agent, allInOne,
-    # collector, storage...). Обычный diff считает это расхождением и приложение
-    # вечно висит в OutOfSync. ServerSideDiff считает diff через dry-run apply,
-    # поэтому дефолты CRD за расхождение не держит.
+    # CRD Jaeger подставляет дефолты, обычный diff видит OutOfSync, поэтому ServerSideDiff
     argocd.argoproj.io/compare-options: ServerSideDiff=true
 spec:
   project: default

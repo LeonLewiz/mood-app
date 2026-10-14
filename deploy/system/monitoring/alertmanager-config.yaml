@@ -1,7 +1,4 @@
-# Маршрутизация алертов Alertmanager. Сам Alertmanager объект создаёт чарт
-# kube-prometheus-stack, а правила доставки живут здесь отдельным объектом:
-# у Alertmanager селекторы пустые, поэтому он подхватывает любой
-# AlertmanagerConfig в своём namespace.
+# правила доставки алертов: у Alertmanager селекторы пустые, он берёт любой AlertmanagerConfig в namespace
 
 apiVersion: monitoring.coreos.com/v1alpha1
 kind: AlertmanagerConfig

@@ -4,10 +4,7 @@ metadata:
   name: app-cert-manager
   namespace: argocd
   annotations:
-    # Чарт отдаёт webhook-конфиги с пустым caBundle, а сам cert-manager
-    # прописывает его в рантайме. Обычный diff считает это расхождением и
-    # приложение висит в OutOfSync, поэтому сравниваем через ServerSideDiff
-    # (то же решение, что у app-monitoring для CRD Jaeger).
+    # webhook caBundle чарт отдаёт пустым, его дописывает cert-manager, поэтому ServerSideDiff
     argocd.argoproj.io/compare-options: ServerSideDiff=true
 spec:
   project: default

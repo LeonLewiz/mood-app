@@ -1,7 +1,4 @@
-# Вход в UI Alertmanager и Grafana через Traefik. Сертификаты выпускает
-# cert-manager, issuer local-selfsigned-issuer (самоподписанный, браузер будет
-# ругаться, пока сертификат не добавлен в доверенные).
-# Имена должны резолвиться на 127.0.0.1, как mood.local и jaeger.mood.local.
+# вход в UI Alertmanager и Grafana через Traefik, сертификаты от local-selfsigned-issuer
 
 apiVersion: networking.k8s.io/v1
 kind: Ingress
