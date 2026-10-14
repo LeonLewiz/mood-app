@@ -46,6 +46,7 @@
 - **cert-manager** - сам выпускает TLS-сертификаты, чтобы было HTTPS.
 - **Prometheus + Grafana + Alertmanager** (kube-prometheus-stack) - сбор метрик, графики
   и уведомления об алертах.
+- **Tempo** - трассировка: путь одного запроса по сервисам и где он тормозит.
 - **External Secrets / Sealed Secrets** - секреты (пароли) не лежат в git открытым текстом.
 - **HPA** - автомасштабирование: если нагрузка растёт, Kubernetes добавляет копии приложения.
 
@@ -72,7 +73,7 @@
  │        │ HTTPS            ▼                                │
  │   cert-manager          Redis                              │
  │                                                            │
- │   Prometheus ◄── /metrics                                  │
+ │   Prometheus ◄── /metrics      Tempo ◄── трассировка       │
  └────────────────────────────────────────────────────────────┘
 ```
 
@@ -112,11 +113,11 @@ root-app.yaml
      ▼
 root-platform-app
      │ смотрит на папку deploy/system/argocd/apps
-     │ и создаёт оттуда девять приложений
+     │ и создаёт оттуда десять приложений
      ▼
 ┌─ манифесты из этого репозитория ───────────────────┐
 │ mood-app             - само приложение, Helm-чарт  │
-│ app-monitoring       - метрики, TLS, алерты, Jaeger│
+│ app-monitoring       - метрики, алерты, TLS        │
 │ cloud-secrets        - секреты из Yandex Lockbox   │
 │ platform             - pod security standards      │
 ├─ публичные helm-чарты, версии пинованы ────────────┤
@@ -124,7 +125,7 @@ root-platform-app
 │ app-cert-manager     - сертификаты                 │
 │ app-sealed-secrets   - расшифровка секретов        │
 │ app-external-secrets - секреты из облака           │
-│ jaeger-operator      - оператор трассировки        │
+│ app-tempo            - трассировка (Tempo)         │
 └────────────────────────────────────────────────────┘
 ```
 
@@ -143,12 +144,9 @@ kubectl get applications -n argocd
 сам k3s, а cert-manager, Sealed Secrets, External Secrets и весь мониторинг ставятся отсюда -
 см. раздел про восстановление ниже.
 
-Операторы тоже разворачиваются отсюда: `jaeger-operator`, `cert-manager`, `sealed-secrets` и
-`external-secrets` берут публичные helm-чарты с пинованными версиями, а значения лежат в
-репозитории (`deploy/system/helm/`). Отдельная грабля была у Jaeger: его чарт по умолчанию даёт
-оператору права только внутри одного namespace, поэтому в `app-jaeger-operator.yaml` включён
-`rbac.clusterRole=true`. Без этого флага оператор не видит объекты в других namespace, и Jaeger
-не поднимается - именно на этом я спотыкался.
+Операторы и обвязка разворачиваются отсюда: `cert-manager`, `sealed-secrets`, `external-secrets`
+и `tempo` берут публичные helm-чарты с зафиксированными версиями, а значения лежат в репозитории
+(`deploy/system/helm/`).
 
 ### Мониторинг и алерты: тоже из git
 
@@ -164,7 +162,7 @@ kubectl get applications -n argocd
 - `deploy/system/monitoring/` - то, чего в чарте нет: ServiceMonitor'ы, Ingress'ы,
   маршрутизация алертов, сетевые политики.
 
-Три грабли, на которые я наступил:
+Три ошибки, которые я допустил:
 
 1. Чарт генерирует пароль администратора Grafana случайно при каждом рендере. ArgoCD видел бы
    вечный `OutOfSync`, а под Grafana перезапускался бы на каждом синке. Пароль пришлось вынести
@@ -211,6 +209,31 @@ kubectl -n monitoring get secret telegram-bot -o jsonpath='{.data.bot-token}' >/
 curl -s 'http://localhost:9090/api/v1/query?query=alertmanager_notifications_total{integration="telegram"}' | jq .
 ```
 
+### Трассировка: Tempo вместо Jaeger
+
+Сначала у меня стоял Jaeger, но приложение спаны не отправляло, а сам Jaeger был v1, который уже
+отправили в архив. Поэтому я поставил **Tempo** (одиночный бинарник из чарта `grafana/tempo`,
+версия зафиксирована в `app-tempo.yaml`).
+
+- трассы лежат на диске (5Gi, `local-path`) и живут 72 часа. Jaeger держал их только в памяти
+  и терял при каждом перезапуске пода;
+- приём открыт и по OTLP (4317, 4318), и по старому формату Jaeger (14268), так что приложению
+  менять придётся только адрес, если оно шлёт спаны старым клиентом;
+- метрики Tempo уходят в Prometheus, а датасорс добавляется в Grafana из значений мониторинга,
+  руками в интерфейсе ничего не нажимается;
+- что бэкенд живой, я проверил тестовым спаном: отправил его по OTLP и нашёл в Tempo. Приложение
+  спаны пока не шлёт, для этого нужен OpenTelemetry, об этом в разделе «что можно улучшить».
+
+Проверить, что Tempo отвечает:
+
+```bash
+kubectl port-forward -n monitoring svc/tempo 3200:3200
+curl -s "http://localhost:3200/api/search/tag/service.name/values"
+```
+
+Пустой список в ответе это нормально, пока приложение спаны не шлёт. Мой тестовый спан я отправлял
+руками, к приложению он не относится.
+
 ### Как восстановить кластер с нуля
 
 Порядок на случай, если кластер снести и поднять заново. Часть шагов живёт вне репозитория,
@@ -245,9 +268,21 @@ chmod 600 ~/sealed-secrets-key-backup.yaml
 kubectl apply -f ~/sealed-secrets-key-backup.yaml
 ```
 
-Если ключа нет: секреты придётся запечатать заново. Для `grafana-admin` и `telegram-bot` это
-просто новые значения, а `yc-auth-secret` - доступ в Yandex Cloud, его надо выпускать в облаке
-заново. Команда для перезапечатывания написана в комментарии внутри каждого файла.
+Если ключа нет: секреты запечатываются заново. Пароль Grafana и токен бота это просто новые
+значения, а `yc-auth-secret` это доступ в Yandex Cloud, его надо выпускать в облаке заново.
+Перезапечатать можно так:
+
+```bash
+kubectl create secret generic grafana-admin -n monitoring --dry-run=client \
+  --from-literal=admin-user=admin --from-literal=admin-password="$(openssl rand -base64 36)" \
+  -o yaml | kubeseal --format yaml > deploy/system/monitoring/grafana-admin-sealed-secret.yaml
+```
+
+Посмотреть пароль, когда он нужен:
+
+```bash
+kubectl get secret -n monitoring grafana-admin -o jsonpath='{.data.admin-password}' | base64 -d
+```
 
 **Шаг 4. Одна команда.** Дальше как обычно:
 
@@ -255,7 +290,7 @@ kubectl apply -f ~/sealed-secrets-key-backup.yaml
 kubectl apply -f deploy/system/argocd/root-app.yaml
 ```
 
-ArgoCD сам создаст девять приложений, включая операторов cert-manager, sealed-secrets и
+ArgoCD сам создаст десять приложений, включая операторов cert-manager, sealed-secrets и
 external-secrets, от которых зависят остальные. Первый синк может ругаться на отсутствующие CRD
 (`ServiceMonitor`, `AlertmanagerConfig`, `ExternalSecret`), пока операторы не поднялись, - это
 нормально, ArgoCD повторит и дотянет.
@@ -269,8 +304,7 @@ kubectl get externalsecret -A          # SecretSynced
 kubectl get sealedsecret -A            # SYNCED=true
 ```
 
-**Имена сайтов** (`mood.local`, `jaeger.mood.local`, `grafana.mood.local`,
-`alertmanager.mood.local`) - это записи в `/etc/hosts` на моей машине, в кластер они не входят.
+**Имена сайтов** (`mood.local`, `grafana.mood.local`, `alertmanager.mood.local`) - это записи в `/etc/hosts` на моей машине, в кластер они не входят.
 
 **Про моё окружение.** На ноутбуке включён VPN в режиме TUN, который перехватывал DNS-запросы к
 адресам сервисов кластера: поды получали фальшивые адреса, из-за чего не работали ни ArgoCD, ни
@@ -309,16 +343,17 @@ kubectl get sealedsecret -A            # SYNCED=true
 - Закрыл сеть и в monitoring: `default-deny` плюс разрешения только на нужные потоки
   (Prometheus скрейпит кластер, Grafana и Alertmanager ходят только к своим датасорсам
   и приёмнику уведомлений).
-
----
+- Заменил трассировку: снёс Jaeger (archive, и спаны в него не шли по-настоящему) и поставил
+  Tempo из git, с трассами на диске, метриками в Prometheus и датасорсом в Grafana.
 
 ---
 
 ## Что можно улучшить
 
-- Трассировка пока не настоящая: в коде приложения нет ни клиента, ни OpenTelemetry, поэтому спаны
-  никто не шлёт, а скрин в `docs/` остался от ручного эксперимента. План: добавить OpenTelemetry и
-  заменить ~~Jaeger~~ на Tempo, тогда вернётся настоящий скрин.
+- Приложение пока не отправляет спаны: в коде нет ни клиента, ни OpenTelemetry. Сам Tempo уже
+  стоит и проверен тестовой трассой, дальше нужен OpenTelemetry в коде приложения.
+- Чарт `grafana/tempo` помечен как deprecated, хотя сам Tempo свежий (2.9.0). Если понадобится
+  микросервисный режим, есть `tempo-distributed` или оператор Tempo.
 - Образы пока в публичном Docker Hub; можно перейти на yandex container registry со сканированием уязвимостей.
 - Добавить тесты и проверку кода в CI.
 - Добавить получателей на разные каналы: сейчас всё уходит в один чат Telegram.
@@ -363,34 +398,33 @@ platform/
 │       │   └── apps/
 │       │       ├── app-mood.yaml       # приложение
 │       │       ├── app-secrets.yaml    # секреты
-│       │       ├── app-monitoring.yaml # метрики, TLS, алерты, Jaeger
+│       │       ├── app-monitoring.yaml # метрики, алерты, TLS
 │       │       ├── app-platform.yaml   # pod security standards
 │       │       ├── app-kube-prometheus.yaml    # мониторинг (пинованная версия чарта)
 │       │       ├── app-cert-manager.yaml       # сертификаты
 │       │       ├── app-sealed-secrets.yaml     # расшифровка секретов
 │       │       ├── app-external-secrets.yaml   # секреты из облака
-│       │       ├── app-jaeger-operator.yaml    # оператор Jaeger
+│       │       ├── app-tempo.yaml              # трассировка (Tempo)
 │       │       ├── repo-prometheus-community.yaml  # подключение helm-репозиториев
+│       │       ├── repo-grafana.yaml
 │       │       ├── repo-cert-manager.yaml
 │       │       ├── repo-sealed-secrets.yaml
 │       │       └── repo-external-secrets.yaml
 │       ├── helm/                      # значения чартов обвязки
 │       │   ├── cert-manager.yaml
 │       │   ├── sealed-secrets.yaml
-│       │   └── external-secrets.yaml
+│       │   ├── external-secrets.yaml
+│       │   └── tempo.yaml
 │       ├── kube-prometheus/
 │       │   └── values.yaml            # значения чарта мониторинга
 │       ├── monitoring/
 │       │   ├── service-monitor.yaml          # Prometheus забирает /metrics
-│       │   ├── service-monitor-jaeger.yaml   # то же самое для Jaeger
 │       │   ├── alertmanager-config.yaml      # куда отправлять алерты
 │       │   ├── telegram-bot-sealed-secret.yaml # токен бота Telegram
 │       │   ├── ingress.yaml                  # UI Alertmanager и Grafana по HTTPS
 │       │   ├── network-policy-monitoring.yaml # кто кого видит в monitoring
-│       │   ├── network-policy-jaeger.yaml
 │       │   ├── grafana-admin-sealed-secret.yaml # пароль Grafana
-│       │   ├── issuer.yaml                   # самоподписанный центр сертификатов
-│       │   └── jaeger.yaml                   # трассировка
+│       │   └── issuer.yaml                   # самоподписанный центр сертификатов
 │       ├── platform/
 │       │   └── namespace-default.yaml  # pod security standards
 │       └── external-secrets/
@@ -399,7 +433,7 @@ platform/
 │           └── yc-sealed-secret.yaml  # доступ к облаку
 │
 ├── docs/
-│   └── jaeger-ui.png                  # скриншот Jaeger
+│   └── jaeger-ui.png                  # скриншот старой трассировки, оставлен на память
 │
 ├── .github/workflows/
 │   └── ci-cd.yml                      # сборка образов + обновление версий
