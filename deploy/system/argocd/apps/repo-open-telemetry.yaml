@@ -1,0 +1,13 @@
+# helm-репа open-telemetry для ArgoCD: репы с ноутбука он не видит, у него свои подключения
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: repo-open-telemetry
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: repository
+stringData:
+  name: open-telemetry
+  type: helm
+  url: https://open-telemetry.github.io/opentelemetry-helm-charts

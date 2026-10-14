@@ -10,6 +10,9 @@ spec:
     metadata:
       labels:
         app: mood-frontend
+      annotations:
+        # агент OpenTelemetry из оператора, трассы уходят в Tempo
+        instrumentation.opentelemetry.io/inject-python: "python"
     spec:
       # Запуск не от root. uid/gid берём у самого образа (appuser = 10001).
       securityContext:

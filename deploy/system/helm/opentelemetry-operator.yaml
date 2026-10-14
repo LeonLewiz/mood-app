@@ -1,0 +1,17 @@
+# значения чарта opentelemetry-operator, версия чарта зафиксирована в app-otel-operator.yaml
+
+admissionWebhooks:
+  # сертификаты вебхука через наш cert-manager, а не через самоподписанные из чарта
+  certManager:
+    enabled: true
+    issuerRef:
+      kind: ClusterIssuer
+      name: local-selfsigned-issuer
+
+manager:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      memory: 256Mi

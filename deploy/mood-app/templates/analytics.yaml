@@ -11,6 +11,9 @@ spec:
     metadata:
       labels:
         app: mood-analytics
+      annotations:
+        # агент OpenTelemetry из оператора, трассы уходят в Tempo
+        instrumentation.opentelemetry.io/inject-python: "python"
     spec:
       securityContext:
         runAsNonRoot: true
