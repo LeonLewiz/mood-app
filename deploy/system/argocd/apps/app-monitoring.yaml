@@ -4,7 +4,7 @@ metadata:
   name: app-monitoring
   namespace: argocd
   annotations:
-    # CRD Jaeger подставляет дефолты, обычный diff видит OutOfSync, поэтому ServerSideDiff
+    # CRD подставляют значения по умолчанию, обычный diff видит OutOfSync, поэтому ServerSideDiff
     argocd.argoproj.io/compare-options: ServerSideDiff=true
 spec:
   project: default
