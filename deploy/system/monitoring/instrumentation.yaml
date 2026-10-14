@@ -1,12 +1,1 @@
-apiVersion: opentelemetry.io/v1alpha1
-kind: Instrumentation
-metadata:
-  # объект лежит в namespace приложения: поды получают агента по аннотации
-  name: python
-  namespace: default
-spec:
-  exporter:
-    endpoint: http://tempo.monitoring:4317
-  sampler:
-    # на домашнем приложении спаны можно собирать все
-    type: parentbased_always_on
+
