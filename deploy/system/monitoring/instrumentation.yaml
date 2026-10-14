@@ -1,1 +1,13 @@
-
+apiVersion: opentelemetry.io/v1alpha1
+kind: Instrumentation
+metadata:
+  # агент добавляется в поды аннотацией instrumentation.opentelemetry.io/inject-python
+  name: python
+  namespace: default
+spec:
+  exporter:
+    # агент по умолчанию экспортирует по http/protobuf, значит нужен http-порт Tempo
+    endpoint: http://tempo.monitoring:4318
+  sampler:
+    # на домашнем приложении спаны можно собирать все
+    type: parentbased_always_on
