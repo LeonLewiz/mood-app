@@ -6,7 +6,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: 'git@github.com:LeonLewiz/platform.git'
+    repoURL: 'git@github.com:LeonLewiz/mood-app.git'
     targetRevision: main
     path: deploy/mood-app
   destination:

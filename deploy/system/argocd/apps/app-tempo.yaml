@@ -7,7 +7,7 @@ spec:
   project: default
   sources:
     # наш репозиторий только как источник значений, ref: values даёт ссылку вида $values/<путь>
-    - repoURL: 'git@github.com:LeonLewiz/platform.git'
+    - repoURL: 'git@github.com:LeonLewiz/mood-app.git'
       targetRevision: main
       ref: values
     - repoURL: 'https://grafana.github.io/helm-charts'

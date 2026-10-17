@@ -8,7 +8,7 @@ spec:
   sources:
     # 1. Наш репозиторий только как источник значений, ref: values даёт ссылку
     #    на них вида $values/<путь от корня репы>.
-    - repoURL: 'git@github.com:LeonLewiz/platform.git'
+    - repoURL: 'git@github.com:LeonLewiz/mood-app.git'
       targetRevision: main
       ref: values
     # 2. Чарт из helm-репы. targetRevision это версия чарта, не ветка, чтобы

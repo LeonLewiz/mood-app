@@ -10,7 +10,7 @@ spec:
   project: default
   sources:
     # 1. Наш репозиторий как источник значений
-    - repoURL: 'git@github.com:LeonLewiz/platform.git'
+    - repoURL: 'git@github.com:LeonLewiz/mood-app.git'
       targetRevision: main
       ref: values
     # 2. Чарт из helm-репы, версия пинована
