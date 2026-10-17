@@ -252,7 +252,7 @@ metrics-server и local-path, в репозитории их нет и не ну
 kubectl -n argocd create secret generic platform-repo-secret \
   --from-literal=type=git \
   --from-literal=url=git@github.com:LeonLewiz/mood-app.git \
-  --from-file=sshPrivateKey=$HOME/.ssh/argocd_deploy_key
+  --from-file=sshPrivateKey=$HOME/.ssh/argocd-deploy-key
 ```
 
 Если сделать репозиторий публичным, ключ не нужен вообще: хватит HTTPS.
