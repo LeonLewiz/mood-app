@@ -46,7 +46,8 @@
 - **cert-manager** - сам выпускает TLS-сертификаты, чтобы было HTTPS.
 - **Prometheus + Grafana + Alertmanager** (kube-prometheus-stack) - сбор метрик, графики
   и уведомления об алертах.
-- **Tempo** - трассировка: путь одного запроса по сервисам и где он тормозит.
+- **Tempo + оператор OpenTelemetry** - трассировка: видно путь одного запроса по сервисам и где он
+  тормозит. Агент в поды добавляет оператор, код приложения трогать не нужно.
 - **External Secrets / Sealed Secrets** - секреты (пароли) не лежат в git открытым текстом.
 - **HPA** - автомасштабирование: если нагрузка растёт, Kubernetes добавляет копии приложения.
 
@@ -113,7 +114,7 @@ root-app.yaml
      ▼
 root-platform-app
      │ смотрит на папку deploy/system/argocd/apps
-     │ и создаёт оттуда десять приложений
+     │ и создаёт оттуда одиннадцать приложений
      ▼
 ┌─ манифесты из этого репозитория ───────────────────┐
 │ mood-app             - само приложение, Helm-чарт  │
@@ -126,6 +127,7 @@ root-platform-app
 │ app-sealed-secrets   - расшифровка секретов        │
 │ app-external-secrets - секреты из облака           │
 │ app-tempo            - трассировка (Tempo)         │
+│ app-otel-operator    - агент в поды приложения     │
 └────────────────────────────────────────────────────┘
 ```
 
@@ -221,18 +223,19 @@ curl -s 'http://localhost:9090/api/v1/query?query=alertmanager_notifications_tot
   менять придётся только адрес, если оно шлёт спаны старым клиентом;
 - метрики Tempo уходят в Prometheus, а датасорс добавляется в Grafana из значений мониторинга,
   руками в интерфейсе ничего не нажимается;
-- что бэкенд живой, я проверил тестовым спаном: отправил его по OTLP и нашёл в Tempo. Приложение
-  спаны пока не шлёт, для этого нужен OpenTelemetry, об этом в разделе «что можно улучшить».
+- **оператор OpenTelemetry** сам добавляет агента в поды приложения по аннотации
+  `instrumentation.opentelemetry.io/inject-python`. Код приложения не меняется, а это и было целью:
+  трассировка это задача платформы, а не разработчиков.
 
-Проверить, что Tempo отвечает:
+Проверено живьём: запрос через ingress рождает трассу из двух сервисов. На `POST /submit` видно
+7 спанов `mood-frontend` и 4 спана `mood-analytics`, то есть весь путь запроса, а не только вход.
+
+Смотреть трассы: Grafana, **Explore**, датасорс **Tempo**. Проверить, что спаны есть:
 
 ```bash
 kubectl port-forward -n monitoring svc/tempo 3200:3200
 curl -s "http://localhost:3200/api/search/tag/service.name/values"
 ```
-
-Пустой список в ответе это нормально, пока приложение спаны не шлёт. Мой тестовый спан я отправлял
-руками, к приложению он не относится.
 
 ### Как восстановить кластер с нуля
 
@@ -290,7 +293,7 @@ kubectl get secret -n monitoring grafana-admin -o jsonpath='{.data.admin-passwor
 kubectl apply -f deploy/system/argocd/root-app.yaml
 ```
 
-ArgoCD сам создаст десять приложений, включая операторов cert-manager, sealed-secrets и
+ArgoCD сам создаст одиннадцать приложений, включая операторов cert-manager, sealed-secrets и
 external-secrets, от которых зависят остальные. Первый синк может ругаться на отсутствующие CRD
 (`ServiceMonitor`, `AlertmanagerConfig`, `ExternalSecret`), пока операторы не поднялись, - это
 нормально, ArgoCD повторит и дотянет.
@@ -350,8 +353,6 @@ kubectl get sealedsecret -A            # SYNCED=true
 
 ## Что можно улучшить
 
-- Приложение пока не отправляет спаны: в коде нет ни клиента, ни OpenTelemetry. Сам Tempo уже
-  стоит и проверен тестовой трассой, дальше нужен OpenTelemetry в коде приложения.
 - Чарт `grafana/tempo` помечен как deprecated, хотя сам Tempo свежий (2.9.0). Если понадобится
   микросервисный режим, есть `tempo-distributed` или оператор Tempo.
 - Образы пока в публичном Docker Hub; можно перейти на yandex container registry со сканированием уязвимостей.
@@ -405,8 +406,10 @@ platform/
 │       │       ├── app-sealed-secrets.yaml     # расшифровка секретов
 │       │       ├── app-external-secrets.yaml   # секреты из облака
 │       │       ├── app-tempo.yaml              # трассировка (Tempo)
+│       │       ├── app-otel-operator.yaml      # оператор OpenTelemetry
 │       │       ├── repo-prometheus-community.yaml  # подключение helm-репозиториев
 │       │       ├── repo-grafana.yaml
+│       │       ├── repo-open-telemetry.yaml
 │       │       ├── repo-cert-manager.yaml
 │       │       ├── repo-sealed-secrets.yaml
 │       │       └── repo-external-secrets.yaml
@@ -414,7 +417,8 @@ platform/
 │       │   ├── cert-manager.yaml
 │       │   ├── sealed-secrets.yaml
 │       │   ├── external-secrets.yaml
-│       │   └── tempo.yaml
+│       │   ├── tempo.yaml
+│       │   └── opentelemetry-operator.yaml
 │       ├── kube-prometheus/
 │       │   └── values.yaml            # значения чарта мониторинга
 │       ├── monitoring/
@@ -423,6 +427,7 @@ platform/
 │       │   ├── telegram-bot-sealed-secret.yaml # токен бота Telegram
 │       │   ├── ingress.yaml                  # UI Alertmanager и Grafana по HTTPS
 │       │   ├── network-policy-monitoring.yaml # кто кого видит в monitoring
+│       │   ├── instrumentation.yaml          # настройки агента для приложения
 │       │   ├── grafana-admin-sealed-secret.yaml # пароль Grafana
 │       │   └── issuer.yaml                   # самоподписанный центр сертификатов
 │       ├── platform/
