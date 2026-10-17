@@ -2,12 +2,14 @@
 
 tempo:
   retention: 72h
+  # чарт по умолчанию просит балласт в 1 гигабайт, он не влезает в лимит и Tempo падает по памяти
+  memBallastSizeMbs: 0
   resources:
     requests:
       cpu: 100m
       memory: 256Mi
     limits:
-      memory: 512Mi
+      memory: 768Mi
 
 # трассы на диске, иначе теряются при перезапуске пода
 persistence:
