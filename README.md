@@ -239,41 +239,89 @@ curl -s "http://localhost:3200/api/search/tag/service.name/values"
 
 ### Как восстановить кластер с нуля
 
-Порядок на случай, если кластер снести и поднять заново. Часть шагов живёт вне репозитория,
-иначе получился бы замкнутый круг: чтобы ArgoCD прочитал репозиторий, ему уже нужен доступ к нему.
+Порядок на случай, если кластер снести и поднять заново. Часть шагов живёт вне репозитория:
+чтобы ArgoCD прочитал репозиторий, ему уже нужен доступ к нему, а приватный ключ в git не положить.
 
-**Шаг 1. Узел и k3s.** Ставим k3s обычным способом. Он сам приносит Traefik, CoreDNS,
-metrics-server и local-path, в репозитории их нет и не нужно.
+На рабочей машине нужны kubectl, helm и kubeseal, плюс клон этого репозитория.
 
-**Шаг 2. ArgoCD и доступ к репозиторию.** Ставим ArgoCD. Ему нужен доступ к репозиторию, а это
-приватный SSH-ключ, который в git лежать не может. Секрет с ключом создаётся руками или скриптом:
+Шаг 1. Узел и k3s.
+
+```bash
+curl -sfL https://get.k3s.io | sh -
+
+mkdir -p ~/.kube
+sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
+sudo chown "$USER" ~/.kube/config
+export KUBECONFIG=~/.kube/config
+
+kubectl get nodes
+```
+
+Traefik, CoreDNS, metrics-server и local-path приносит сам k3s, в репозитории их нет и не нужно.
+
+Шаг 2. ArgoCD.
+
+```bash
+kubectl create namespace argocd
+kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+kubectl -n argocd rollout status deploy/argocd-server
+```
+
+Теперь доступ к репозиторию. Ключ лежит в `~/.ssh/argocd-deploy-key`, в git его нет:
 
 ```bash
 kubectl -n argocd create secret generic platform-repo-secret \
   --from-literal=type=git \
   --from-literal=url=git@github.com:LeonLewiz/mood-app.git \
-  --from-file=sshPrivateKey=$HOME/.ssh/argocd-deploy-key
+  --from-file=sshPrivateKey="$HOME/.ssh/argocd-deploy-key" \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+kubectl -n argocd label secret platform-repo-secret \
+  argocd.argoproj.io/secret-type=repository
 ```
 
-Если сделать репозиторий публичным, ключ не нужен вообще: хватит HTTPS.
-
-**Шаг 3. Ключ печати секретов.** Три секрета в репозитории зашифрованы (`SealedSecret`), причём
-публичным ключом конкретного контроллера. На новом кластере контроллер сгенерирует новую пару,
-и старые файлы не расшифруются, поэтому приватный ключ надо вернуть. Он лежит в kube-system в
-секрете с меткой `sealedsecrets.bitnami.com/sealed-secrets-key=active`:
+Метка обязательна. Без неё ArgoCD видит обычный секрет и про репозиторий не знает.
+Проверить, что он его подхватил:
 
 ```bash
-# бэкап ключа: держать вне git, это корень доверия для всех запечатанных секретов
-kubectl get secret -n kube-system sealed-secrets-keyscqsx -o yaml > ~/sealed-secrets-key-backup.yaml
-chmod 600 ~/sealed-secrets-key-backup.yaml
+kubectl get secret -n argocd -l argocd.argoproj.io/secret-type=repository
+```
 
-# восстановление на новом кластере: применить ДО того, как применять сами SealedSecret
+Если сделать репозиторий публичным, ключ и секрет не нужны вообще, хватит HTTPS-ссылки.
+
+Шаг 3. Ключ печати секретов.
+
+Три секрета в репозитории зашифрованы публичным ключом конкретного контроллера, поэтому на новом
+кластере старые файлы не расшифруются: контроллер сгенерирует свою пару. Ключ надо вернуть, причём
+до шага 4. У меня он лежит в облаке, вне репозитория.
+
+Бэкап снимается заранее, на живом кластере, и только через временный файл: если секрет не найдётся,
+`>` создаст пустой файл и затрёт рабочий бэкап.
+
+```bash
+kubectl get secret -n kube-system \
+  -l sealedsecrets.bitnami.com/sealed-secrets-key=active \
+  -o yaml > /tmp/sealed-secrets-key.yaml
+
+test -s /tmp/sealed-secrets-key.yaml || { echo "секрет не найден, бэкап не тронут"; exit 1; }
+chmod 600 /tmp/sealed-secrets-key.yaml
+mv /tmp/sealed-secrets-key.yaml ~/sealed-secrets-key-backup.yaml
+```
+
+Имя секрета руками не пишется: суффикс генерируется при установке, на новом кластере он будет
+другой. Поэтому выборка по метке.
+
+Восстановление, до root-app:
+
+```bash
 kubectl apply -f ~/sealed-secrets-key-backup.yaml
 ```
 
-Если ключа нет: секреты запечатываются заново. Пароль Grafana и токен бота это просто новые
-значения, а `yc-auth-secret` это доступ в Yandex Cloud, его надо выпускать в облаке заново.
-Перезапечатать можно так:
+Порядок важен. Если применить ключ после root-app, контроллер успеет создать свою пару, и
+запечатанные файлы из репозитория не откроются.
+
+Ключа нет, значит печатаем заново. `grafana-admin` и `telegram-bot` это просто новые значения, а
+`yc-auth-secret` это ключ сервисного аккаунта Yandex Cloud, его надо выпускать в облаке:
 
 ```bash
 kubectl create secret generic grafana-admin -n monitoring --dry-run=client \
@@ -281,24 +329,45 @@ kubectl create secret generic grafana-admin -n monitoring --dry-run=client \
   -o yaml | kubeseal --format yaml > deploy/system/monitoring/grafana-admin-sealed-secret.yaml
 ```
 
-Посмотреть пароль, когда он нужен:
+Посмотреть пароль Grafana, когда он нужен:
 
 ```bash
 kubectl get secret -n monitoring grafana-admin -o jsonpath='{.data.admin-password}' | base64 -d
 ```
 
-**Шаг 4. Одна команда.** Дальше как обычно:
+Шаг 4. Остальное одной командой.
+
+Из корня репозитория:
 
 ```bash
 kubectl apply -f deploy/system/argocd/root-app.yaml
 ```
 
-ArgoCD сам создаст одиннадцать приложений, включая операторов cert-manager, sealed-secrets и
+ArgoCD создаст одиннадцать приложений, включая операторов cert-manager, sealed-secrets и
 external-secrets, от которых зависят остальные. Первый синк может ругаться на отсутствующие CRD
-(`ServiceMonitor`, `AlertmanagerConfig`, `ExternalSecret`), пока операторы не поднялись, - это
+(`ServiceMonitor`, `AlertmanagerConfig`, `ExternalSecret`), пока операторы не поднялись, это
 нормально, ArgoCD повторит и дотянет.
 
-**Что проверить, когда всё успокоится:**
+Если ArgoCD не работает вообще: `argocd-server` перезапускается по кругу, `kubectl get applications`
+отвечает «the server doesn't have a resource type», а в логе k3s каждые 20 секунд мелькает
+`customresource_handler.go ... failed to update store with options`. Значит API-сервер не поднял
+хендлеры CRD, которые создавались в момент его старта, и такие CRD висят в
+`Established=False, reason=Installing`. Перезапуск k3s тут не помогает, помогает толчок вручную:
+
+```bash
+# CRD, у которых в статусе Established=False, ArgoCD не видит
+for c in applications.argoproj.io applicationsets.argoproj.io appprojects.argoproj.io sealedsecrets.bitnami.com; do
+  kubectl annotate crd "$c" retry="$(date +%s)" --overwrite
+done
+```
+
+Проверить статус любого CRD: `kubectl get crd <имя> -o jsonpath='{.status.conditions}'`. Приём с
+аннотацией работает для всех, кто застрял в `Installing`.
+
+Пароль Redis в репозитории не запечатан: `redis-production-secret` тянет External Secrets из
+Yandex Lockbox, поэтому нужен доступ к тому же облаку.
+
+Что проверить, когда всё успокоится:
 
 ```bash
 kubectl get applications -n argocd     # все Synced и Healthy
@@ -307,13 +376,14 @@ kubectl get externalsecret -A          # SecretSynced
 kubectl get sealedsecret -A            # SYNCED=true
 ```
 
-**Имена сайтов** (`mood.local`, `grafana.mood.local`, `alertmanager.mood.local`) - это записи в `/etc/hosts` на моей машине, в кластер они не входят.
+Имена сайтов (`mood.local`, `grafana.mood.local`, `alertmanager.mood.local`) это записи в `/etc/hosts` на моей машине, в кластер они не входят.
 
-**Про моё окружение.** На ноутбуке включён VPN в режиме TUN, который перехватывал DNS-запросы к
-адресам сервисов кластера: поды получали фальшивые адреса, из-за чего не работали ни ArgoCD, ни
-датасорсы Grafana, ни связи между сервисами. Лечится правилом в VPN (домен `+.cluster.local`
-уходит на локальный адрес CoreDNS). В кластере для этого есть сервис `coredns-lan` (порт узла
-30053), но в репозиторий я его не положил: он про мою машину, а не про проект.
+Про моё окружение. На ноутбуке включён VPN в режиме TUN, и он перехватывает DNS-запросы к адресам
+сервисов кластера: поды получают фальшивые адреса, из-за чего не работают ни ArgoCD (падает с
+`authentication handshake failed: EOF`), ни датасорсы Grafana, ни связи между сервисами. Лечится
+правилом в VPN: домен `+.cluster.local` уходит на `127.0.0.1:30053`, где слушает `coredns-lan` из
+`deploy/system/platform/`. Без этого сервиса правило смотрит в пустоту, внутрикластерные имена
+дают SERVFAIL, поэтому его надо поднимать вместе с кластером.
 
 ---
 
@@ -364,7 +434,7 @@ kubectl get sealedsecret -A            # SYNCED=true
 ## Структура репозитория
 
 ```
-platform/
+mood-app/
 ├── apps/
 │   ├── frontend/
 │   │   ├── app.py                     # сайт: форма, /metrics, история в Redis
@@ -431,7 +501,8 @@ platform/
 │       │   ├── grafana-admin-sealed-secret.yaml # пароль Grafana
 │       │   └── issuer.yaml                   # самоподписанный центр сертификатов
 │       ├── platform/
-│       │   └── namespace-default.yaml  # pod security standards
+│       │   ├── namespace-default.yaml  # pod security standards
+│       │   └── coredns-lan.yaml        # DNS кластера для VPN на localhost:30053
 │       └── external-secrets/
 │           ├── secret-store.yaml      # подключение к Yandex Cloud Lockbox
 │           ├── external-secret.yaml   # тянет пароль Redis

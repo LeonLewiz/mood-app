@@ -1,0 +1,22 @@
+# DNS кластера на localhost:30053, туда смотрит VPN, который иначе перехватывает запросы к ClusterIP
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: coredns-lan
+  namespace: kube-system
+spec:
+  type: NodePort
+  selector:
+    k8s-app: kube-dns
+  ports:
+  - name: dns-udp
+    port: 53
+    targetPort: 53
+    protocol: UDP
+    nodePort: 30053
+  - name: dns-tcp
+    port: 53
+    targetPort: 53
+    protocol: TCP
+    nodePort: 30053
