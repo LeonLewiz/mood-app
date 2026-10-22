@@ -19,7 +19,7 @@ services:
 
   analytics-service:
     build:
-      context: ./analytics
+      context: ./apps/analytics
     container_name: mood-analytics
     environment:
       - PORT=8001
@@ -35,7 +35,7 @@ services:
 
   frontend-service:
     build:
-      context: ./frontend
+      context: ./apps/frontend
     container_name: mood-frontend
     environment:
       - PORT=8000
