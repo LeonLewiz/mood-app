@@ -12,6 +12,9 @@ spec:
     metadata:
       labels:
         app: mood-redis
+      annotations:
+        # прокси меша в поде: mTLS и метрики между сервисами
+        linkerd.io/inject: enabled
     spec:
       securityContext:
         runAsNonRoot: true
@@ -79,4 +82,5 @@ spec:
   - port: {{ .Values.redis.port }}
   selector:
     app: mood-redis
+
 

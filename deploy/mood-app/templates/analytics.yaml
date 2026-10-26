@@ -14,6 +14,8 @@ spec:
       annotations:
         # агент OpenTelemetry из оператора, трассы уходят в Tempo
         instrumentation.opentelemetry.io/inject-python: "python"
+        # прокси меша в поде: mTLS и метрики между сервисами
+        linkerd.io/inject: enabled
     spec:
       securityContext:
         runAsNonRoot: true
@@ -60,3 +62,4 @@ spec:
     targetPort: {{ .Values.analytics.port }}
   selector:
     app: mood-analytics
+
