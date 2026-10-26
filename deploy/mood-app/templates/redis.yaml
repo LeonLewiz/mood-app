@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: mood-redis
+  namespace: {{ .Release.Namespace }}
 spec:
   replicas: 1
   selector:
@@ -21,7 +22,7 @@ spec:
           type: RuntimeDefault
       containers:
       - name: redis
-        image: redis:7.2-alpine
+        image: {{ .Values.redis.image }}
         securityContext:
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true
@@ -32,17 +33,12 @@ spec:
         - name: REDIS_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: redis-production-secret
+              name: {{ .Values.redis.passwordSecret }}
               key: redis-password
         ports:
-        - containerPort: 6379
+        - containerPort: {{ .Values.redis.port }}
         resources:
-          requests:
-            memory: "64Mi"
-            cpu: "50m"
-          limits:
-            memory: "128Mi"
-            cpu: "200m"
+          {{- toYaml .Values.redis.resources | nindent 10 }}
         livenessProbe:
           exec:
             command: ["sh", "-c", "redis-cli -a \"$REDIS_PASSWORD\" --no-auth-warning ping"]
@@ -65,19 +61,22 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: mood-redis-data
+  namespace: {{ .Release.Namespace }}
 spec:
   accessModes:
   - ReadWriteOnce
   resources:
     requests:
-      storage: 1Gi
+      storage: {{ .Values.redis.storage }}
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: redis
+  namespace: {{ .Release.Namespace }}
 spec:
   ports:
-  - port: 6379
+  - port: {{ .Values.redis.port }}
   selector:
     app: mood-redis
+

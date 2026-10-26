@@ -1,7 +1,57 @@
-analytics:
-  repository: leonlewiz/mood-analytics
-  tag: latest
+# теги обновляет CI при пуше в main, руками не трогать
 
 frontend:
   repository: leonlewiz/mood-frontend
   tag: latest
+  port: 8000
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+analytics:
+  repository: leonlewiz/mood-analytics
+  tag: latest
+  port: 8001
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+redis:
+  image: redis:7.2-alpine
+  port: 6379
+  passwordSecret: redis-production-secret
+  storage: 1Gi
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+ingress:
+  host: mood.local
+  tlsSecret: mood-local-tls-cert
+  clusterIssuer: local-selfsigned-issuer
+
+rateLimit:
+  average: 5
+  burst: 10
+
+autoscaling:
+  frontend:
+    minReplicas: 1
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 70
+  analytics:
+    minReplicas: 1
+    maxReplicas: 3
+    targetCPUUtilizationPercentage: 70

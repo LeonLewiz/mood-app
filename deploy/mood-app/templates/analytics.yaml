@@ -2,8 +2,8 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: mood-analytics
+  namespace: {{ .Release.Namespace }}
 spec:
-
   selector:
     matchLabels:
       app: mood-analytics
@@ -30,37 +30,33 @@ spec:
           capabilities:
             drop: ["ALL"]
         ports:
-        - containerPort: 8001
+        - containerPort: {{ .Values.analytics.port }}
         resources:
-          requests:
-            memory: "64Mi"
-            cpu: "50m"
-          limits:
-            memory: "128Mi"
-            cpu: "200m"
+          {{- toYaml .Values.analytics.resources | nindent 10 }}
         livenessProbe:
           httpGet:
             path: /healthz
-            port: 8001
+            port: {{ .Values.analytics.port }}
           initialDelaySeconds: 10
           periodSeconds: 10
         readinessProbe:
           httpGet:
             path: /healthz
-            port: 8001
+            port: {{ .Values.analytics.port }}
           initialDelaySeconds: 5
           periodSeconds: 5
         env:
         - name: PORT
-          value: "8001"
+          value: "{{ .Values.analytics.port }}"
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: analytics-service
+  namespace: {{ .Release.Namespace }}
 spec:
   ports:
-  - port: 8001
-    targetPort: 8001
+  - port: {{ .Values.analytics.port }}
+    targetPort: {{ .Values.analytics.port }}
   selector:
     app: mood-analytics

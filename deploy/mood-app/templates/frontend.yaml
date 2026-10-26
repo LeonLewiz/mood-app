@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: mood-frontend
+  namespace: {{ .Release.Namespace }}
 spec:
   selector:
     matchLabels:
@@ -30,45 +31,41 @@ spec:
           capabilities:
             drop: ["ALL"]
         ports:
-        - containerPort: 8000
+        - containerPort: {{ .Values.frontend.port }}
         resources:
-          requests:
-            memory: "64Mi"
-            cpu: "50m"
-          limits:
-            memory: "128Mi"
-            cpu: "200m"
+          {{- toYaml .Values.frontend.resources | nindent 10 }}
         livenessProbe:
           httpGet:
             path: /healthz
-            port: 8000
+            port: {{ .Values.frontend.port }}
           initialDelaySeconds: 10
           periodSeconds: 10
         readinessProbe:
           httpGet:
             path: /healthz
-            port: 8000
+            port: {{ .Values.frontend.port }}
           initialDelaySeconds: 5
           periodSeconds: 5
         env:
         - name: PORT
-          value: "8000"
+          value: "{{ .Values.frontend.port }}"
         - name: REDIS_HOST
           value: "redis"
         - name: REDIS_PORT
-          value: "6379"
+          value: "{{ .Values.redis.port }}"
         - name: REDIS_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: redis-production-secret
+              name: {{ .Values.redis.passwordSecret }}
               key: redis-password
         - name: ANALYTICS_SERVICE_URL
-          value: "http://analytics-service:8001"
+          value: "http://analytics-service:{{ .Values.analytics.port }}"
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: frontend-service
+  namespace: {{ .Release.Namespace }}
   # Метка нужна ServiceMonitor'у: он выбирает сервис по ней, а selector ниже
   # выбирает поды, это разные вещи. Без метки Prometheus цель не видит.
   labels:
@@ -77,7 +74,7 @@ spec:
   ports:
   # Порт назван специально: ServiceMonitor ищет цель по имени порта.
   - name: web
-    port: 8000
-    targetPort: 8000
+    port: {{ .Values.frontend.port }}
+    targetPort: {{ .Values.frontend.port }}
   selector:
     app: mood-frontend
