@@ -8,12 +8,12 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: mood-frontend
-  minReplicas: 1
-  maxReplicas: 5
+  minReplicas: {{ .Values.autoscaling.frontend.minReplicas }}
+  maxReplicas: {{ .Values.autoscaling.frontend.maxReplicas }}
   metrics:
   - type: Resource
     resource:
       name: cpu
       target:
         type: Utilization
-        averageUtilization: 70
+        averageUtilization: {{ .Values.autoscaling.frontend.targetCPUUtilizationPercentage }}

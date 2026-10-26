@@ -2,17 +2,19 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: mood-ingress
+  namespace: {{ .Release.Namespace }}
   annotations:
     ingress.kubernetes.io/ssl-redirect: "true"
-    cert-manager.io/cluster-issuer: "local-selfsigned-issuer"
-    traefik.ingress.kubernetes.io/router.middlewares: default-test-rate-limit@kubernetescrd
+    cert-manager.io/cluster-issuer: "{{ .Values.ingress.clusterIssuer }}"
+    # в Traefik имя middleware выглядит как <namespace>-<имя>@kubernetescrd
+    traefik.ingress.kubernetes.io/router.middlewares: "{{ .Release.Namespace }}-test-rate-limit@kubernetescrd"
 spec:
   tls:
   - hosts:
-    - mood.local
-    secretName: mood-local-tls-cert
+    - "{{ .Values.ingress.host }}"
+    secretName: {{ .Values.ingress.tlsSecret }}
   rules:
-  - host: mood.local
+  - host: {{ .Values.ingress.host }}
     http:
       paths:
       - path: /
@@ -21,4 +23,4 @@ spec:
           service:
             name: frontend-service
             port:
-              number: 8000
+              number: {{ .Values.frontend.port }}

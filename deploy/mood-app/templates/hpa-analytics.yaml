@@ -8,12 +8,12 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: mood-analytics
-  minReplicas: 1
-  maxReplicas: 3
+  minReplicas: {{ .Values.autoscaling.analytics.minReplicas }}
+  maxReplicas: {{ .Values.autoscaling.analytics.maxReplicas }}
   metrics:
   - type: Resource
     resource:
       name: cpu
       target:
         type: Utilization
-        averageUtilization: 70
+        averageUtilization: {{ .Values.autoscaling.analytics.targetCPUUtilizationPercentage }}
