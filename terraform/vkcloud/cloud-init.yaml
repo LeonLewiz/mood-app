@@ -1,0 +1,24 @@
+#cloud-config
+
+package_update: true
+packages:
+  - curl
+  - ca-certificates
+
+write_files:
+  - path: /usr/local/bin/install-k3s.sh
+    permissions: "0755"
+    content: |
+      #!/bin/bash
+      set -euo pipefail
+      # tls-san добавляет публичный адрес в сертификат, иначе kubectl снаружи
+      # ругается на несовпадение имени.
+      curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="--tls-san ${public_ip}" sh -
+      mkdir -p /home/ubuntu/.kube
+      k3s kubectl config view --raw > /home/ubuntu/.kube/config
+      sed -i "s|127.0.0.1|${public_ip}|" /home/ubuntu/.kube/config
+      chown -R ubuntu:ubuntu /home/ubuntu/.kube
+      chmod 600 /home/ubuntu/.kube/config
+
+runcmd:
+  - [bash, /usr/local/bin/install-k3s.sh]
