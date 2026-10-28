@@ -1,0 +1,9 @@
+# Скопируй в terraform.tfvars и подставь свои значения.
+# tfvars в .gitignore, потому что здесь могут оказаться адреса и id.
+
+cloud_id  = "b1gtb0614qoh8a61kmlu"
+folder_id = "b1ggiurmtu05m63s2slo"
+
+# По умолчанию в security group пускается только твой адрес.
+# Узнать: curl -s https://ifconfig.me
+allowed_cidrs = ["203.0.113.10/32"]
