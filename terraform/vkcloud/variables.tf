@@ -10,6 +10,13 @@ variable "name_prefix" {
   default = "mood-k3s"
 }
 
+# Имя, под которым кластер виден снаружи. Адрес узла выдаёт балансировщик
+# уже после установки, поэтому в сертификат попадает имя, а не адрес.
+variable "api_hostname" {
+  type    = string
+  default = "k3s.mood.local"
+}
+
 variable "image_os_distro" {
   type    = string
   default = "ubuntu"
@@ -20,7 +27,7 @@ variable "image_os_version" {
   default = "22.04"
 }
 
-# Кто может ходить на узел: ssh, ingress и API кластера.
+# Кто вообще может подключиться к публичному адресу балансировщика.
 # Префикс обязателен, одиночный адрес без /32 не принимается.
 # Узнать: curl -s https://ifconfig.me
 variable "allowed_cidrs" {

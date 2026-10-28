@@ -1,4 +1,4 @@
-# Внешняя сеть, через неё узел получит публичный адрес.
+# Внешняя сеть, на ней будет стоять балансировщик и получать публичный адрес.
 data "vkcs_networking_network" "extnet" {
   name = "internet"
 }
@@ -14,6 +14,8 @@ resource "vkcs_networking_subnet" "k3s" {
   cidr       = "10.10.0.0/24"
 }
 
+# Роутер нужен не для входящих, а для исходящих: узел без публичного адреса,
+# и без маршрута наружу cloud-init не скачает k3s.
 resource "vkcs_networking_router" "k3s" {
   name                = "${var.name_prefix}-router"
   external_network_id = data.vkcs_networking_network.extnet.id
@@ -32,27 +34,32 @@ resource "vkcs_networking_secgroup" "k3s" {
 }
 
 locals {
-  ingress_ports = {
-    ssh     = 22
-    http    = 80
-    https   = 443
-    k3s-api = 6443
+  # Порты, которые узел принимает снаружи. Наружу их публикует балансировщик,
+  # а сам узел пускает только с твоего адреса и из своей подсети.
+  exposed_ports = {
+    ssh   = 22
+    api   = 6443
+    http  = 80
+    https = 443
   }
+
+  # Подсеть узла нужна в списке, потому что к нему ходит балансировщик,
+  # и приходит он именно из этой подсети.
+  ingress_sources = concat(var.allowed_cidrs, [vkcs_networking_subnet.k3s.cidr])
 }
 
-# Порт на адрес: если адресов в allowed_cidrs несколько, правил станет больше.
 resource "vkcs_networking_secgroup_rule" "ingress" {
   for_each = {
-    for pair in setproduct(keys(local.ingress_ports), var.allowed_cidrs) :
+    for pair in setproduct(keys(local.exposed_ports), local.ingress_sources) :
     "${pair[0]}-${pair[1]}" => { port = pair[0], cidr = pair[1] }
   }
 
   security_group_id = vkcs_networking_secgroup.k3s.id
-  description       = each.value.port
+  description       = "порт ${each.value.port} для ${each.value.cidr}"
   direction         = "ingress"
   protocol          = "tcp"
-  port_range_min    = local.ingress_ports[each.value.port]
-  port_range_max    = local.ingress_ports[each.value.port]
+  port_range_min    = local.exposed_ports[each.value.port]
+  port_range_max    = local.exposed_ports[each.value.port]
   remote_ip_prefix  = each.value.cidr
 }
 
@@ -64,11 +71,4 @@ resource "vkcs_networking_secgroup_rule" "icmp" {
   direction         = "ingress"
   protocol          = "icmp"
   remote_ip_prefix  = each.value
-}
-
-# Адрес выдаётся до создания узла, поэтому его можно передать в cloud-init
-# и сразу получить kubeconfig, который работает снаружи.
-resource "vkcs_networking_floatingip" "k3s" {
-  pool        = "internet"
-  description = "Публичный адрес узла k3s"
 }
