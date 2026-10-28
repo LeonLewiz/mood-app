@@ -1,20 +1,4 @@
-# Всё три необязательные: если не задавать, провайдер возьмёт их из
-# окружения OS_USERNAME, OS_PASSWORD и OS_PROJECT_ID. См. terraform.tfvars.example.
-variable "username" {
-  type    = string
-  default = null
-}
-
-variable "password" {
-  type      = string
-  sensitive = true
-  default   = null
-}
-
-variable "project_id" {
-  type    = string
-  default = null
-}
+# Доступа в переменных нет, он берётся из окружения, см. versions.tf.
 
 variable "availability_zone" {
   type    = string
