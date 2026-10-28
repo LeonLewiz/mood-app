@@ -9,8 +9,6 @@ terraform {
   }
 }
 
-# Логин, пароль и id проекта берутся из вкладки Terraform в панели VK Cloud,
-# там же лежит готовый файл провайдера с username и project_id.
 provider "vkcs" {
   username   = var.username
   password   = var.password

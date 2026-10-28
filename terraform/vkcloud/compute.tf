@@ -15,7 +15,7 @@ data "vkcs_compute_flavor" "k3s" {
   min_ram = var.memory * 1024
 }
 
-# Публичный ключ заливаем как есть, приватный в state не попадает.
+# Публичный ключ
 resource "vkcs_compute_keypair" "k3s" {
   name       = "${var.name_prefix}-key"
   public_key = file(var.ssh_public_key_path)
@@ -46,8 +46,6 @@ resource "vkcs_compute_instance" "k3s" {
     public_ip = vkcs_networking_floatingip.k3s.address
   })
 
-  # Узел должен попасть в подсеть с маршрутом наружу, иначе cloud-init
-  # не скачает k3s.
   depends_on = [vkcs_networking_router_interface.k3s]
 }
 
