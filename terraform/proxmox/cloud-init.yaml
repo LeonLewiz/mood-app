@@ -1,0 +1,27 @@
+#cloud-config
+
+package_update: true
+packages:
+  - curl
+  - ca-certificates
+  - qemu-guest-agent
+
+write_files:
+  - path: /usr/local/bin/install-k3s.sh
+    permissions: "0755"
+    content: |
+      #!/bin/bash
+      set -euo pipefail
+      # Адрес известен самой ВМ, поэтому подставляем его на месте: узел выдаёт
+      # его же в сертификат, и kubectl ходит по нему как есть.
+      ip=$(hostname -I | awk '{print $1}')
+      curl -sfL https://get.k3s.io | sh -
+      mkdir -p /home/ubuntu/.kube
+      k3s kubectl config view --raw > /home/ubuntu/.kube/config
+      sed -i "s|127.0.0.1|$ip|" /home/ubuntu/.kube/config
+      chown -R ubuntu:ubuntu /home/ubuntu/.kube
+      chmod 600 /home/ubuntu/.kube/config
+
+runcmd:
+  - systemctl enable --now qemu-guest-agent
+  - [bash, /usr/local/bin/install-k3s.sh]

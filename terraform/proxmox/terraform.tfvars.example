@@ -1,0 +1,30 @@
+# Скопируй в terraform.tfvars и поправь под свой второй ПК.
+# Доступа здесь нет, он в окружении.
+
+# ---------------------------------------------------------------------------
+# Перед запуском экспортируй адрес и токен Proxmox:
+#
+#   export PROXMOX_VE_ENDPOINT="https://192.168.1.10:8006/"
+#   export PROXMOX_VE_API_TOKEN="terraform@pve!provider=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+#
+# Токен создаётся на самом Proxmox:
+#   pveum user add terraform@pve
+#   pveum aclmod / -user terraform@pve -role PVEAdmin
+#   pveum user token add terraform@pve provider --privsep=0
+#
+# Snippet с cloud-init заливается по ssh, поэтому перед terraform нужен ssh-agent:
+#   eval "$(ssh-agent -s)" && ssh-add ~/.ssh/id_ed25519
+#
+# На хранилище для образов (обычно local) должны быть разрешены типы
+# содержимого Import и Snippets: Datacenter, Storage, выбрать local,
+# Edit, в списке Content отметить Import и Snippets.
+# ---------------------------------------------------------------------------
+
+# Имя узла и адрес ВМ смотри в веб-панели Proxmox.
+node_name = "pve"
+
+# Диски на стандартной установке лежат на local-lvm.
+disk_datastore_id = "local-lvm"
+
+# Образы и snippet на local.
+image_datastore_id = "local"
