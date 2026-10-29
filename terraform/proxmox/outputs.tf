@@ -1,19 +1,26 @@
-# Индекс 1, а не 0: нулевым идёт петлевой интерфейс.
-output "vm_ip" {
-  description = "Адрес ВМ в локальной сети"
-  value       = try(proxmox_virtual_environment_vm.k3s.ipv4_addresses[1][0], null)
+output "nodes" {
+  description = "Узлы кластера: роль, адрес, ресурсы"
+  value = {
+    for name, node in var.nodes : name => {
+      role   = node.role
+      ip     = split("/", node.address)[0]
+      cores  = node.cores
+      memory = node.memory
+      disk   = node.disk
+    }
+  }
 }
 
-output "vm_id" {
-  value = proxmox_virtual_environment_vm.k3s.vm_id
-}
-
-output "hosts_entry" {
-  description = "Добавить в /etc/hosts на ноутбуке"
-  value       = "адрес-из-vm_ip k3s.mood.local mood.local"
+output "control_plane_ip" {
+  value = local.server_ip
 }
 
 output "kubeconfig_command" {
-  description = "Забрать kubeconfig с узла"
-  value       = "scp ubuntu@адрес-из-vm_ip:~/.kube/config ~/.kube/config-mood-k3s"
+  description = "Забрать kubeconfig с управляющего узла"
+  value       = "scp ubuntu@${local.server_ip}:~/.kube/config ~/.kube/config-mood-k3s"
+}
+
+output "check_command" {
+  description = "Проверить, что все три узла в кластере"
+  value       = "kubectl --kubeconfig ~/.kube/config-mood-k3s get nodes -o wide"
 }

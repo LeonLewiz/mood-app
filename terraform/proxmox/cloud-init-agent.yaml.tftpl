@@ -1,0 +1,28 @@
+#cloud-config
+
+package_update: true
+packages:
+  - curl
+  - ca-certificates
+  - qemu-guest-agent
+
+write_files:
+  - path: /usr/local/bin/install-k3s-agent.sh
+    permissions: "0755"
+    content: |
+      #!/bin/bash
+      set -euo pipefail
+      # ВМ создаются параллельно, и сервер может ещё не успеть подняться,
+      # поэтому ждём его порт, а не падаем сразу.
+      for i in $(seq 1 120); do
+        if timeout 3 bash -c "</dev/tcp/${server_ip}/6443" 2>/dev/null; then
+          break
+        fi
+        echo "сервер ${server_ip}:6443 пока не отвечает, попытка $i из 120"
+        sleep 5
+      done
+      curl -sfL https://get.k3s.io | K3S_URL=https://${server_ip}:6443 K3S_TOKEN=${token} INSTALL_K3S_EXEC="agent" sh -
+
+runcmd:
+  - systemctl enable --now qemu-guest-agent
+  - [bash, /usr/local/bin/install-k3s-agent.sh]
