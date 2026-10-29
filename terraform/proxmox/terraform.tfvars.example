@@ -1,36 +1,6 @@
-# Скопируй в terraform.tfvars и поправь под свой сервер.
-# Доступа здесь нет, он в окружении.
-
-# ---------------------------------------------------------------------------
-# Перед запуском экспортируешь адрес и токен Proxmox:
-#
-#   export PROXMOX_VE_ENDPOINT="https://192.168.3.100:8006/"
-#   export PROXMOX_VE_API_TOKEN="terraform-prov@pve!terraform-token=СЕКРЕТ"
-#
-# Токен создаётся на самом Proxmox, у него должен быть privsep=0, тогда он
-# наследует права роли. Роли нужны привилегии:
-#   VM.Config.Cloudinit     создание cloud-init диска
-#   Datastore.Allocate      заливка snippet
-#   Datastore.AllocateTemplate  скачивание образа
-#   SDN.Audit               провайдер не увидит мост без неё
-#   VM.GuestAgent.Audit     чтение адреса ВМ
-#
-# Snippet заливается по ssh, поэтому перед terraform нужен ssh-agent:
-#   eval "$(ssh-agent -s)" && ssh-add ~/.ssh/id_ed25519
-#
-# На хранилище для образов нужны разрешённые типы содержимого Import,
-# Snippets и Backup: Datacenter, Storage, выбрать хранилище, Edit.
-#
-# Диски трём ВМ нужны на NVMe, и перед apply стоит отдать пулу свободное место:
-#   lvextend -l +100%FREE /dev/pve/data
-# ---------------------------------------------------------------------------
-
-node_name = "proxmox"
-
-# Быстрое хранилище под диски ВМ.
-disk_datastore_id = "local-lvm"
-
-# Хранилище для образа и snippets, на большом диске.
+node_name          = "proxmox"
+disk_datastore_id  = "local-lvm"
 image_datastore_id = "data"
-
-# Сами узлы, их адреса и размеры описаны в variables.tf в переменной nodes.
+vm_prefix          = "mood-k3s"
+gateway            = "192.168.3.1"
+dns_servers        = ["192.168.3.1"]

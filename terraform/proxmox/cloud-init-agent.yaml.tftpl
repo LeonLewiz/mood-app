@@ -12,8 +12,6 @@ write_files:
     content: |
       #!/bin/bash
       set -euo pipefail
-      # ВМ создаются параллельно, и сервер может ещё не успеть подняться,
-      # поэтому ждём его порт, а не падаем сразу.
       for i in $(seq 1 120); do
         if timeout 3 bash -c "</dev/tcp/${server_ip}/6443" 2>/dev/null; then
           break

@@ -7,7 +7,6 @@ packages:
   - qemu-guest-agent
 
 write_files:
-  # Токен задаём до установки, чтобы агенты знали его заранее.
   - path: /etc/rancher/k3s/config.yaml
     content: |
       token: ${token}

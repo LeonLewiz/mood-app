@@ -1,9 +1,6 @@
-# Доступа в переменных нет, он берётся из окружения, см. versions.tf.
-
 variable "node_name" {
-  description = "Имя узла Proxmox, оно же видно в его веб-панели"
-  type        = string
-  default     = "proxmox"
+  type    = string
+  default = "proxmox"
 }
 
 variable "vm_prefix" {
@@ -11,13 +8,11 @@ variable "vm_prefix" {
   default = "mood-k3s"
 }
 
-# Диски ВМ. local-lvm это lvmthin на NVMe, там быстро.
 variable "disk_datastore_id" {
   type    = string
   default = "local-lvm"
 }
 
-# Хранилище для образа и snippets. На нём нужны типы содержимого Import и Snippets.
 variable "image_datastore_id" {
   type    = string
   default = "data"
@@ -48,15 +43,11 @@ variable "ssh_public_key_path" {
   default = "~/.ssh/id_ed25519.pub"
 }
 
-# Стоит ли держать control plane только под управление. Если true, на нём не будут
-# селиться обычные поды, и это правильная продовая схема. Осторожно: тогда часть
-# штатных компонентов вроде ingress переезжает на воркеры.
 variable "dedicated_control_plane" {
   type    = bool
   default = false
 }
 
-# Три узла: один сервер k3s и два агента. Адреса из той же сети, что и Proxmox.
 variable "nodes" {
   type = map(object({
     address = string

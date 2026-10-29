@@ -1,20 +1,15 @@
-# Адрес сервера берём из описания узлов, чтобы не дублировать его руками.
 locals {
   server_ip = split("/", [for n in var.nodes : n.address if n.role == "server"][0])[0]
 }
 
-# Образ качается самим Proxmox, наружу ходит он, а не terraform.
 resource "proxmox_download_file" "os" {
   content_type = "import"
   datastore_id = var.image_datastore_id
   node_name    = var.node_name
   url          = var.image_url
-  # Расширение qcow2 обязательно, по нему Proxmox понимает формат при импорте.
-  file_name = "ubuntu-server-cloudimg-amd64.qcow2"
+  file_name    = "ubuntu-server-cloudimg-amd64.qcow2"
 }
 
-# Токен задаём сами, иначе агенты не смогут присоединиться: свой токен сервер
-# генерирует только при первом запуске, и Terraform его не увидит.
 resource "random_password" "k3s_token" {
   length  = 48
   special = false
@@ -48,7 +43,6 @@ resource "proxmox_virtual_environment_vm" "k3s" {
   node_name = var.node_name
   tags      = ["k3s", "terraform", each.value.role]
 
-  # Агент нужен, чтобы Proxmox сообщал адрес ВМ и гасил её по-хорошему.
   agent {
     enabled = true
   }
