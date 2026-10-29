@@ -1,6 +1,6 @@
 node_name          = "proxmox"
 disk_datastore_id  = "local-lvm"
-image_datastore_id = "data"
+image_datastore_id = "local"
 vm_prefix          = "mood-k3s"
 gateway            = "192.168.3.1"
 dns_servers        = ["192.168.3.1"]
