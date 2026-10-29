@@ -8,6 +8,7 @@ locals {
       token     = random_password.k3s_token.result
       server_ip = local.server_ip
       ssh_key   = local.ssh_key
+      hostname  = "${var.vm_prefix}-${name}"
       address   = node.address
       gateway   = var.gateway
       dns       = local.dns

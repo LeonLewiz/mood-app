@@ -1,5 +1,8 @@
 #cloud-config
 
+hostname: ${hostname}
+manage_etc_hosts: true
+
 ssh_authorized_keys:
   - ${ssh_key}
 
