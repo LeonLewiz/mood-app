@@ -31,7 +31,7 @@ variable "bridge" {
 
 variable "image_url" {
   type    = string
-  default = "https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img"
+  default = "https://cloud-images.ubuntu.com/resolute/current/resolute-server-cloudimg-amd64.img"
 }
 
 variable "cores" {

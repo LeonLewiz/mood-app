@@ -16,4 +16,11 @@ terraform {
 provider "proxmox" {
   # Сертификат на Proxmox самоподписанный, в локальной сети это нормально.
   insecure = true
+
+  # Snippet заливается по ssh, а у токена пароля нет, поэтому имя узла и ключ
+  # берутся из ssh-агента. Перед terraform нужен ssh-add.
+  ssh {
+    agent    = true
+    username = "root"
+  }
 }
