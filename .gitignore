@@ -1,7 +1,23 @@
+# секреты: в репозиторий попадают только зашифрованные SealedSecrets
 .env
+authorized_key.json
+*sealed-secrets-key*
+
+# значения terraform подставляются из tfvars, в git лежит только пример
+*.tfvars
+
+# состояние terraform принадлежит машине, где его применяли
+.terraform/
+*.tfstate
+*.tfstate.backup
+# lock-файл провайдера наоборот коммитим: он фиксирует версии зависимостей
+
+# python
 __pycache__/
 *.pyc
 *.pyo
 .pytest_cache/
+
+# мусор от редакторов и системы
 .DS_Store
 Thumbs.db
