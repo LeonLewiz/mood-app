@@ -1,5 +1,8 @@
 #cloud-config
 
+ssh_authorized_keys:
+  - ${ssh_key}
+
 package_update: true
 packages:
   - curl
@@ -7,6 +10,23 @@ packages:
   - qemu-guest-agent
 
 write_files:
+  - path: /etc/netplan/90-static.yaml
+    permissions: "0600"
+    content: |
+      network:
+        version: 2
+        ethernets:
+          k3s-nic:
+            match:
+              macaddress: ${mac}
+            addresses:
+              - ${address}
+            routes:
+              - to: default
+                via: ${gateway}
+            nameservers:
+              addresses: [${dns}]
+
   - path: /etc/rancher/k3s/config.yaml
     content: |
       token: ${token}
@@ -25,5 +45,6 @@ write_files:
       chmod 600 /home/ubuntu/.kube/config
 
 runcmd:
+  - netplan apply
   - systemctl enable --now qemu-guest-agent
   - [bash, /usr/local/bin/install-k3s.sh]

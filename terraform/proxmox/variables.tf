@@ -15,7 +15,7 @@ variable "disk_datastore_id" {
 
 variable "image_datastore_id" {
   type    = string
-  default = "data"
+  default = "local"
 }
 
 variable "bridge" {
@@ -51,6 +51,7 @@ variable "dedicated_control_plane" {
 variable "nodes" {
   type = map(object({
     address = string
+    mac     = string
     cores   = number
     memory  = number
     disk    = number
@@ -60,6 +61,7 @@ variable "nodes" {
   default = {
     control = {
       address = "192.168.3.151/24"
+      mac     = "bc:24:11:00:00:51"
       cores   = 2
       memory  = 2048
       disk    = 15
@@ -67,6 +69,7 @@ variable "nodes" {
     }
     worker1 = {
       address = "192.168.3.152/24"
+      mac     = "bc:24:11:00:00:52"
       cores   = 2
       memory  = 4096
       disk    = 20
@@ -74,6 +77,7 @@ variable "nodes" {
     }
     worker2 = {
       address = "192.168.3.153/24"
+      mac     = "bc:24:11:00:00:53"
       cores   = 2
       memory  = 5120
       disk    = 25
