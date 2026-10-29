@@ -1,521 +1,201 @@
-# Mood Detector - учебный DevOps-проект
+# mood-app
 
-Мой pet-проект, на котором я учился DevOps.
+![Proxmox VE 9](https://img.shields.io/badge/proxmox%20ve-9-E57000?logo=proxmox&logoColor=white) ![Terraform](https://img.shields.io/badge/terraform-1.17-844FBA?logo=terraform&logoColor=white) ![k3s](https://img.shields.io/badge/k3s-1.36-FFC61C?logo=k3s&logoColor=black) ![ArgoCD](https://img.shields.io/badge/argocd-gitops-EF7B4D?logo=argo&logoColor=white) ![Grafana](https://img.shields.io/badge/prometheus%20%2B%20grafana-monitoring-E6522C?logo=prometheus&logoColor=white) ![Tempo](https://img.shields.io/badge/tempo-traces-F46800?logo=grafana&logoColor=white) ![CI](https://github.com/LeonLewiz/mood-app/actions/workflows/ci-cd.yml/badge.svg)
 
----
+Кластер Kubernetes на трёх домашних виртуалках, приложение на нём и весь обвес вокруг: создание машин кодом, доставка через GitOps, мониторинг, трассировка, секреты.
 
-## Что делает приложение
+Репозиторий собран как портфолио. Кластер живёт на моём домашнем сервере, зайти туда снаружи нельзя, поэтому весь стенд описан кодом и проверяется командами ниже.
 
-Маленький сайт "Определитель настроения":
+![Работающее приложение](docs/screenshot-app.png)
 
-1. Ты вводишь текст в форму.
-2. Он уходит во второй сервис (analytics), который считает длину текста и выдаёт "настроение".
-3. Результат сохраняется в **Redis**, чтобы показывать историю последних запросов.
-4. Есть страница `/metrics`, откуда **Prometheus** забирает цифры (сколько запросов, сколько по времени).
+## Что умеет приложение
 
-Логика "настроения" - чем длиннее текст, тем "позитивнее".
+Пользователь вводит фразу, аналитика считает длину и выдаёт настроение по простому правилу: длинный текст считается позитивным, короткий нейтральным. Результат показывается на странице, история последних запросов лежит в Redis.
 
----
+Приложение намеренно маленькое: два сервиса на Python и Redis. Смысл репозитория не в нём, а в том, как оно собирается, доставляется и наблюдается.
 
-## Из чего состоит
+## Стек
 
-| Часть | Что это | Зачем |
+| Технология | Что делает | Почему она |
 |---|---|---|
-| `apps/frontend` | Python + FastAPI | сайт с формой, отдаёт `/metrics` |
-| `apps/analytics` | Python + FastAPI | считает результат по тексту |
-| `redis` | база в памяти | хранит историю последних 20 запросов |
-| `docker-compose.yml` | локальный запуск | чтобы посмотреть приложение на своём компьютере |
-| `deploy/mood-app` | Helm-чарт | описание приложения для Kubernetes |
-| `deploy/system/argocd/root-app.yaml` | **точка входа в кластер** | применяешь его один раз - ArgoCD поднимает всё остальное |
-| `deploy/system` | манифесты инфраструктуры | ArgoCD, мониторинг, секреты |
+| Proxmox VE 9 | виртуализация | домашний сервер, есть API, платить не нужно |
+| Terraform | создаёт виртуалки | кластер воспроизводится одной командой |
+| cloud-init | первичная настройка машин | k3s ставится сам при первом старте, руками в ВМ я не захожу |
+| k3s 1.36 | Kubernetes | один бинарник, для трёх узлов и 12 ГБ памяти хватает |
+| ArgoCD | доставка | приложения едут из репозитория, кластер сам выравнивает себя к нему |
+| Helm | шаблоны | приложение и системные компоненты описаны чартами |
+| Sealed Secrets | секреты | пароли лежат в Git зашифрованными и расшифровываются только в кластере |
+| kube-prometheus | мониторинг | Prometheus, Grafana и Alertmanager одним чартом |
+| OpenTelemetry + Tempo | трассировка | видно путь запроса между сервисами |
+| cert-manager | сертификаты | выдаёт самоподписанный сертификат для ingress |
+| GitHub Actions | CI | собирает образы и обновляет теги в values.yaml |
 
----
-
-## Технологии (и зачем они тут)
-
-- **Docker** - упаковываю приложение в образ, чтобы оно одинаково работало везде.
-  Образы собираются через `multi-stage` и на **distroless** от гугл.
-- **Docker Compose** - запуск всех сервисов локально одной командой.
-- **Kubernetes (k3s)** - кластер, который сам следит, чтобы приложения работали, перезапускает
-  упавшие, распределяет нагрузку.
-- **Helm** - шаблоны для Kubernetes.
-- **GitHub Actions** - CI/CD. При пуше кода бот собирает образы, отправляет их в Docker Hub
-  и обновляет версии в Helm-чарте.
-- **ArgoCD** - GitOps. Следит за этим репозиторием и сам применяет изменения в кластере.
-- **Traefik** - вход в кластер (ingress). Принимает запросы снаружи и решает, куда их отправить.
-- **cert-manager** - сам выпускает TLS-сертификаты, чтобы было HTTPS.
-- **Prometheus + Grafana + Alertmanager** (kube-prometheus-stack) - сбор метрик, графики
-  и уведомления об алертах.
-- **Tempo + оператор OpenTelemetry** - трассировка: видно путь одного запроса по сервисам и где он
-  тормозит. Агент в поды добавляет оператор, код приложения трогать не нужно.
-- **External Secrets / Sealed Secrets** - секреты (пароли) не лежат в git открытым текстом.
-- **HPA** - автомасштабирование: если нагрузка растёт, Kubernetes добавляет копии приложения.
-
----
-
-## Как это устроено
+## Как всё устроено
 
 ```
-   я пишу код
-       │  git push
-       ▼
- GitHub Actions ──► собирает образы ──► Docker Hub
-       │                                  │
-       │ обновляет версию в Helm-чарте     │
-       ▼                                  │
-   git-репозиторий                        │
-       │                                  │
-       │ ArgoCD видит изменения           │
-       ▼                                  ▼
- ┌───────────────────── Kubernetes (k3s) ─────────────────────┐
- │                                                            │
- │   Traefik (вход) ──► frontend ──► analytics                │
- │        ▲                  │                                │
- │        │ HTTPS            ▼                                │
- │   cert-manager          Redis                              │
- │                                                            │
- │   Prometheus ◄── /metrics      Tempo ◄── трассировка       │
- └────────────────────────────────────────────────────────────┘
+        ноутбук
+           │   https://mood.local, https://grafana.mood.local
+           │   имена прописаны в /etc/hosts на адрес 192.168.3.151
+           ▼
+  ┌─────────────────────────────────────────────┐
+  │  Proxmox VE 9, узел proxmox, 192.168.3.100  │
+  │                                             │
+  │   mood-k3s-control    192.168.3.151   4 ГБ  │
+  │   mood-k3s-worker1    192.168.3.152   3 ГБ  │
+  │   mood-k3s-worker2    192.168.3.153   5 ГБ  │
+  └────────────────────┬────────────────────────┘
+                       │  кластер k3s, Traefik отвечает на всех трёх
+                       ▼
+  ┌─────────────────────────────────────────────┐
+  │  ArgoCD смотрит в этот репозиторий          │
+  │    ├── mood-app      фронтенд, аналитика,   │
+  │    │                 Redis, HPA, ingress    │
+  │    ├── monitoring    Prometheus, Grafana,   │
+  │    │                 Alertmanager           │
+  │    ├── tracing       оператор OTel и Tempo  │
+  │    ├── secrets       Sealed Secrets         │
+  │    └── certificates  cert-manager           │
+  └─────────────────────────────────────────────┘
 ```
 
-Коротко весь путь: **код > сборка > образ > GitOps > кластер**.
+Доступа из интернета к кластеру нет. Сертификаты самоподписанные, поэтому браузер на них ругается, это ожидаемо. Алерты настроены на Telegram.
 
----
+## Что ArgoCD завозит в кластер
 
-## Как это поднимается
+Точкой входа служит `deploy/system/argocd/root-app.yaml`. Это app-of-apps: один манифест, который создаёт остальные приложения из папки `deploy/system/argocd/apps`. Дальше новые манифесты приезжают в кластер пушем в репозиторий, kubectl для них не нужен.
 
-### Локально (просто посмотреть приложение)
+| Приложение ArgoCD | Что разворачивает |
+|---|---|
+| root-platform-app | остальные приложения из папки apps |
+| app-platform | namespace `default` |
+| app-sealed-secrets | контроллер Sealed Secrets |
+| app-cert-manager | cert-manager |
+| app-otel-operator | оператор OpenTelemetry |
+| app-tempo | Tempo для хранения трасс |
+| app-kube-prometheus | Prometheus, Grafana, Alertmanager, node-exporter |
+| app-monitoring | ingress, issuer, AlertmanagerConfig, ServiceMonitor, Instrumentation |
+| local-secrets | зашифрованные секреты (Redis, Grafana, бот Telegram) |
+| mood-app | само приложение |
 
-Docker Compose нужен только для локальной разработки, в кластере он не используется.
+Всего десять приложений. Адреса Helm-репозиториев заведены отдельными Secret в той же папке.
 
-```bash
-# 1. создай .env рядом с docker-compose.yml
-echo "REDIS_PASSWORD=мой_пароль" > .env
+## Как поднять с нуля
 
-# 2. подними всё
-docker compose up --build
+Порядок важен, потому что некоторые вещи ArgoCD развозит параллельно, а зависимости между ними есть.
+
+1. Подготовить Proxmox. Нужны API-токен с правами на создание ВМ и загрузку файлов, хранилище с включёнными snippets и Ubuntu cloud-образ. У меня всё это на узле с адресом 192.168.3.100.
+
+2. Создать виртуалки. Диски живут на NVMe, образы и бэкапы на отдельном HDD.
+
+```
+cd terraform/proxmox
+cp terraform.tfvars.example terraform.tfvars
+export PROXMOX_VE_ENDPOINT="https://192.168.3.100:8006/"
+export PROXMOX_VE_API_TOKEN="terraform-prov@pve!terraform-token=..."
+terraform init
+terraform apply
 ```
 
-Сайт: http://localhost:8000 · аналитика: http://localhost:8001/healthz
+Через пару минут появятся три машины. k3s на них ставится сам через cloud-init, первая нода поднимается сервером, две другие приходят к ней агентами.
 
-### В кластер: одна команда
-
-Точка входа в кластер - **`deploy/system/argocd/root-app.yaml`**. С него всё начинается:
-
-```bash
-kubectl apply -f deploy/system/argocd/root-app.yaml
-```
-
-Дальше работает сам:
+3. Снять kubeconfig с control-узла и заменить в нём адрес на 192.168.3.151.
 
 ```
-root-app.yaml
-     │ создаёт в ArgoCD одно корневое приложение
-     ▼
-root-platform-app
-     │ смотрит на папку deploy/system/argocd/apps
-     │ и создаёт оттуда одиннадцать приложений
-     ▼
-┌─ манифесты из этого репозитория ───────────────────┐
-│ mood-app             - само приложение, Helm-чарт  │
-│ app-monitoring       - метрики, алерты, TLS        │
-│ cloud-secrets        - секреты из Yandex Lockbox   │
-│ platform             - pod security standards      │
-├─ публичные helm-чарты, версии пинованы ────────────┤
-│ app-kube-prometheus  - мониторинг целиком          │
-│ app-cert-manager     - сертификаты                 │
-│ app-sealed-secrets   - расшифровка секретов        │
-│ app-external-secrets - секреты из облака           │
-│ app-tempo            - трассировка (Tempo)         │
-│ app-otel-operator    - агент в поды приложения     │
-└────────────────────────────────────────────────────┘
+ssh ubuntu@192.168.3.151 'sudo cat /etc/rancher/k3s/k3s.yaml' > ~/.kube/config-mood-k3s
 ```
 
-Это паттерн **app-of-apps**: одно приложение создаёт остальные. Поэтому руками в кластер
-ничего применять не нужно - коммит в git, и ArgoCD сам приводит кластер к нужному виду
-(включены `auto-sync`, `selfHeal` и `prune`).
+4. Поставить ArgoCD. CRD для ApplicationSet приходится применять отдельно и с флагом server-side, иначе манифест не проходит по размеру. Про эту ошибку ниже.
 
-Проверить, что поднялось:
-
-```bash
-kubectl get applications -n argocd
 ```
-
-Что должно быть **заранее** (ставится отдельно, не этим репозиторием): только k3s и ArgoCD
-плюс доступ ArgoCD к этому репозиторию. Traefik, CoreDNS, metrics-server и local-path приносит
-сам k3s, а cert-manager, Sealed Secrets, External Secrets и весь мониторинг ставятся отсюда -
-см. раздел про восстановление ниже.
-
-Операторы и обвязка разворачиваются отсюда: `cert-manager`, `sealed-secrets`, `external-secrets`
-и `tempo` берут публичные helm-чарты с зафиксированными версиями, а значения лежат в репозитории
-(`deploy/system/helm/`).
-
-### Мониторинг и алерты: тоже из git
-
-Раньше kube-prometheus-stack стоял в кластере, поставленный руками через `helm install`.
-Теперь его ставит ArgoCD приложением `app-kube-prometheus`, а версия чарта пинована:
-обновление мониторинга - отдельный коммит, а не то, что прилетело само.
-
-- `deploy/system/argocd/apps/app-kube-prometheus.yaml` - само приложение: версия чарта
-  `92.3.0`, имя релиза `kube-prometheus` (от него зависят имена всех объектов) и два
-  источника: значения из этого репозитория плюс чарт из helm-репозитория.
-- `deploy/system/kube-prometheus/values.yaml` - значения: хранилище для Prometheus и
-  Alertmanager, пароль Grafana, внешние адреса UI.
-- `deploy/system/monitoring/` - то, чего в чарте нет: ServiceMonitor'ы, Ingress'ы,
-  маршрутизация алертов, сетевые политики.
-
-Три ошибки, которые я допустил:
-
-1. Чарт генерирует пароль администратора Grafana случайно при каждом рендере. ArgoCD видел бы
-   вечный `OutOfSync`, а под Grafana перезапускался бы на каждом синке. Пароль пришлось вынести
-   в SealedSecret и сказать чарту `existingSecret`.
-2. В StatefulSet нельзя дописать том на месте: Kubernetes запрещает менять
-   `volumeClaimTemplates` у существующего объекта. Оператор сам пересоздаёт StatefulSet, поды
-   перезапускаются один раз.
-3. У Prometheus в значениях чарта поле называется `storageSpec`, а в самом объекте Prometheus
-   оно превращается в `storage`. Напишешь `storage` - чарт молча проигнорирует, и тома не будет.
-
-Проверить, что всё сошлось:
-
-```bash
-kubectl get application -n argocd app-kube-prometheus   # должно быть Synced
-kubectl get pvc -n monitoring                           # тома Prometheus и Alertmanager
-kubectl get alertmanagerconfig -n monitoring            # правила доставки алертов
-```
-
-Проверить, что уведомления реально доходят, не дожидаясь настоящего алерта: открываем доступ
-к API Alertmanager и отправляем в него тестовый алерт.
-
-```bash
-kubectl port-forward -n monitoring svc/kube-prometheus-kube-prome-alertmanager 9093:9093
-```
-
-```bash
-curl -X POST -H 'Content-Type: application/json' \
-  -d '[{"labels":{"alertname":"Проверка","severity":"warning","namespace":"monitoring"}}]' \
-  http://localhost:9093/api/v2/alerts
-```
-
-Через полминуты (это `group_wait`) уведомление появится в логе приёмника:
-
-```bash
-kubectl -n monitoring get secret telegram-bot -o jsonpath='{.data.bot-token}' >/dev/null && echo "bot token на месте"
-```
-
-Уведомления уходят в **Telegram**: получатель `telegram` в
-`deploy/system/monitoring/alertmanager-config.yaml` берёт токен бота из Secret, а не из
-репозитория (сам токен зашифрован в `telegram-bot-sealed-secret.yaml`). Проверить канал можно
-тем же тестовым алертом: сообщение должно прийти в чат. Цифры доставки видны в Prometheus:
-
-```bash
-curl -s 'http://localhost:9090/api/v1/query?query=alertmanager_notifications_total{integration="telegram"}' | jq .
-```
-
-### Трассировка: Tempo вместо Jaeger
-
-Сначала у меня стоял Jaeger, но приложение спаны не отправляло, а сам Jaeger был v1, который уже
-отправили в архив. Поэтому я поставил **Tempo** (одиночный бинарник из чарта `grafana/tempo`,
-версия зафиксирована в `app-tempo.yaml`).
-
-- трассы лежат на диске (5Gi, `local-path`) и живут 72 часа. Jaeger держал их только в памяти
-  и терял при каждом перезапуске пода;
-- приём открыт и по OTLP (4317, 4318), и по старому формату Jaeger (14268), так что приложению
-  менять придётся только адрес, если оно шлёт спаны старым клиентом;
-- метрики Tempo уходят в Prometheus, а датасорс добавляется в Grafana из значений мониторинга,
-  руками в интерфейсе ничего не нажимается;
-- **оператор OpenTelemetry** сам добавляет агента в поды приложения по аннотации
-  `instrumentation.opentelemetry.io/inject-python`. Код приложения не меняется, а это и было целью:
-  трассировка это задача платформы, а не разработчиков.
-
-Проверено живьём: запрос через ingress рождает трассу из двух сервисов. На `POST /submit` видно
-7 спанов `mood-frontend` и 4 спана `mood-analytics`, то есть весь путь запроса, а не только вход.
-
-Смотреть трассы: Grafana, **Explore**, датасорс **Tempo**. Проверить, что спаны есть:
-
-```bash
-kubectl port-forward -n monitoring svc/tempo 3200:3200
-curl -s "http://localhost:3200/api/search/tag/service.name/values"
-```
-
-### Как восстановить кластер с нуля
-
-Порядок на случай, если кластер снести и поднять заново. Часть шагов живёт вне репозитория:
-чтобы ArgoCD прочитал репозиторий, ему уже нужен доступ к нему, а приватный ключ в git не положить.
-
-На рабочей машине нужны kubectl, helm и kubeseal, плюс клон этого репозитория.
-
-Шаг 1. Узел и k3s.
-
-```bash
-curl -sfL https://get.k3s.io | sh -
-
-mkdir -p ~/.kube
-sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
-sudo chown "$USER" ~/.kube/config
-export KUBECONFIG=~/.kube/config
-
-kubectl get nodes
-```
-
-Traefik, CoreDNS, metrics-server и local-path приносит сам k3s, в репозитории их нет и не нужно.
-
-Шаг 2. ArgoCD.
-
-```bash
 kubectl create namespace argocd
 kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
-kubectl -n argocd rollout status deploy/argocd-server
+kubectl apply --server-side=true -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/crds/applicationset-crd.yaml
 ```
 
-Теперь доступ к репозиторию. Ключ лежит в `~/.ssh/argocd-deploy-key`, в git его нет:
+5. Положить в ArgoCD SSH-ключ от репозитория. Секрет называется `platform-repo-secret`, в Git он не лежит по понятным причинам.
 
-```bash
-kubectl -n argocd create secret generic platform-repo-secret \
-  --from-literal=type=git \
-  --from-literal=url=git@github.com:LeonLewiz/mood-app.git \
-  --from-file=sshPrivateKey="$HOME/.ssh/argocd-deploy-key" \
-  --dry-run=client -o yaml | kubectl apply -f -
+6. Восстановить мастер-ключ Sealed Secrets в namespace `kube-system`. Без него ни один зашифрованный секрет не расшифруется, а ошибка выглядит как обычный сбой синхронизации. Ключ снимается один раз при первом развёртывании и хранится вне репозитория.
 
-kubectl -n argocd label secret platform-repo-secret \
-  argocd.argoproj.io/secret-type=repository
+```
+kubectl apply -f sealed-secrets-key-backup.yaml
 ```
 
-Метка обязательна. Без неё ArgoCD видит обычный секрет и про репозиторий не знает.
-Проверить, что он его подхватил:
+7. Запустить app-of-apps и дождаться, пока всё съедется.
 
-```bash
-kubectl get secret -n argocd -l argocd.argoproj.io/secret-type=repository
 ```
-
-Если сделать репозиторий публичным, ключ и секрет не нужны вообще, хватит HTTPS-ссылки.
-
-Шаг 3. Ключ печати секретов.
-
-Три секрета в репозитории зашифрованы публичным ключом конкретного контроллера, поэтому на новом
-кластере старые файлы не расшифруются: контроллер сгенерирует свою пару. Ключ надо вернуть, причём
-до шага 4. У меня он лежит в облаке, вне репозитория.
-
-Бэкап снимается заранее, на живом кластере, и только через временный файл: если секрет не найдётся,
-`>` создаст пустой файл и затрёт рабочий бэкап.
-
-```bash
-kubectl get secret -n kube-system \
-  -l sealedsecrets.bitnami.com/sealed-secrets-key=active \
-  -o yaml > /tmp/sealed-secrets-key.yaml
-
-test -s /tmp/sealed-secrets-key.yaml || { echo "секрет не найден, бэкап не тронут"; exit 1; }
-chmod 600 /tmp/sealed-secrets-key.yaml
-mv /tmp/sealed-secrets-key.yaml ~/sealed-secrets-key-backup.yaml
-```
-
-Имя секрета руками не пишется: суффикс генерируется при установке, на новом кластере он будет
-другой. Поэтому выборка по метке.
-
-Восстановление, до root-app:
-
-```bash
-kubectl apply -f ~/sealed-secrets-key-backup.yaml
-```
-
-Порядок важен. Если применить ключ после root-app, контроллер успеет создать свою пару, и
-запечатанные файлы из репозитория не откроются.
-
-Ключа нет, значит печатаем заново. `grafana-admin` и `telegram-bot` это просто новые значения, а
-`yc-auth-secret` это ключ сервисного аккаунта Yandex Cloud, его надо выпускать в облаке:
-
-```bash
-kubectl create secret generic grafana-admin -n monitoring --dry-run=client \
-  --from-literal=admin-user=admin --from-literal=admin-password="$(openssl rand -base64 36)" \
-  -o yaml | kubeseal --format yaml > deploy/system/monitoring/grafana-admin-sealed-secret.yaml
-```
-
-Посмотреть пароль Grafana, когда он нужен:
-
-```bash
-kubectl get secret -n monitoring grafana-admin -o jsonpath='{.data.admin-password}' | base64 -d
-```
-
-Шаг 4. Остальное одной командой.
-
-Из корня репозитория:
-
-```bash
 kubectl apply -f deploy/system/argocd/root-app.yaml
+kubectl -n argocd get applications
 ```
 
-ArgoCD создаст одиннадцать приложений, включая операторов cert-manager, sealed-secrets и
-external-secrets, от которых зависят остальные. Первый синк может ругаться на отсутствующие CRD
-(`ServiceMonitor`, `AlertmanagerConfig`, `ExternalSecret`), пока операторы не поднялись, это
-нормально, ArgoCD повторит и дотянет.
+8. Прописать имена на рабочей машине. Имена заканчиваются на `.local`, и это отдельная история, о ней в разделе с ошибками.
 
-Если ArgoCD не работает вообще: `argocd-server` перезапускается по кругу, `kubectl get applications`
-отвечает «the server doesn't have a resource type», а в логе k3s каждые 20 секунд мелькает
-`customresource_handler.go ... failed to update store with options`. Значит API-сервер не поднял
-хендлеры CRD, которые создавались в момент его старта, и такие CRD висят в
-`Established=False, reason=Installing`. Перезапуск k3s тут не помогает, помогает толчок вручную:
-
-```bash
-# CRD, у которых в статусе Established=False, ArgoCD не видит
-for c in applications.argoproj.io applicationsets.argoproj.io appprojects.argoproj.io sealedsecrets.bitnami.com; do
-  kubectl annotate crd "$c" retry="$(date +%s)" --overwrite
-done
+```
+192.168.3.151 mood.local grafana.mood.local alertmanager.mood.local
 ```
 
-Проверить статус любого CRD: `kubectl get crd <имя> -o jsonpath='{.status.conditions}'`. Приём с
-аннотацией работает для всех, кто застрял в `Installing`.
+## Что проверено на живом кластере
 
-Пароль Redis в репозитории не запечатан: `redis-production-secret` тянет External Secrets из
-Yandex Lockbox, поэтому нужен доступ к тому же облаку.
-
-Что проверить, когда всё успокоится:
-
-```bash
-kubectl get applications -n argocd     # все Synced и Healthy
-kubectl get certificates -A            # сертификаты Ready
-kubectl get externalsecret -A          # SecretSynced
-kubectl get sealedsecret -A            # SYNCED=true
+```
+kubectl get nodes                      три узла Ready, k3s 1.36.5
+kubectl -n argocd get applications     десять приложений, все Synced и Healthy
+kubectl top nodes                      control 55% памяти, воркеры 51% и 30%
+curl -H 'Host: mood.local' https://192.168.3.151/    200, и так на каждом узле
 ```
 
-Имена сайтов (`mood.local`, `grafana.mood.local`, `alertmanager.mood.local`) это записи в `/etc/hosts` на моей машине, в кластер они не входят.
+Трассировка проверена на настоящем запросе. `POST /submit` даёт одну трассу из одиннадцати спанов: семь у mood-frontend, четыре у mood-analytics. Видны обращения к Redis и переход между сервисами.
 
-Про моё окружение. На ноутбуке включён VPN в режиме TUN, и он перехватывает DNS-запросы к адресам
-сервисов кластера: поды получают фальшивые адреса, из-за чего не работают ни ArgoCD (падает с
-`authentication handshake failed: EOF`), ни датасорсы Grafana, ни связи между сервисами. Лечится
-правилом в VPN: домен `+.cluster.local` уходит на `127.0.0.1:30053`, где слушает `coredns-lan` из
-`deploy/system/platform/`. Без этого сервиса правило смотрит в пустоту, внутрикластерные имена
-дают SERVFAIL, поэтому его надо поднимать вместе с кластером.
+## Ошибки, на которые я наступил
 
----
+Собрал здесь то, что стоило времени, вместе с причиной.
 
-## Что я настроил сам (по пунктам)
+Статический адрес применился только к одной машине из трёх. Остальные две не отвечали по SSH. Причина в имени интерфейса: Proxmox создаёт его как `eth0`, а Ubuntu переименовывает в `ens18`, поэтому конфиг сети из cloud-init просто не находил интерфейс. Починил отдельным netplan-файлом, который цепляется к сетевой карте по MAC-адресу.
 
-- Разделил проект на два сервиса и связал их по HTTP.
-- Собрал безопасные Docker-образы: multi-stage + distroless + rootless.
-- Добавил health-check'и, чтобы Kubernetes понимал, когда приложение живое
-  (liveness/readiness probes), и не слал трафик в мёртвый под.
-- Описал приложение в Helm-чарте.
-- Настроил CI/CD: сборка образов и автоподстановка новых версий в чарт.
-- Настроил GitOps через ArgoCD. Точка входа `deploy/system/argocd/root-app.yaml`: применяешь его один раз, и корневое приложение создаёт остальные (app-of-apps).
-- Подключил HTTPS с автоматическими сертификатами и редиректом с HTTP.
-- Настроил сбор метрик (свои счётчики в коде)
-- Настроил секреты: External Secrets из Yandex Cloud Lockbox + Sealed Secrets.
-- Добавил HPA (автомасштабирование) и NetworkPolicy (какие сервисы видят друг друга).
-- Закрыл сеть по умолчанию: в namespace стоит `default-deny` на вход и выход, а разрешено
-  только нужное - DNS, Traefik и Prometheus внутрь приложения, приложение в аналитику и Redis.
-- Запустил все контейнеры не от root: `runAsNonRoot`, read-only корневая ФС, без capabilities,
-  плюс метки Pod Security Standards на namespace.
-- Перевёл мониторинг под GitOps: kube-prometheus-stack ставится ArgoCD из публичного чарта
-  с пинованной версией, а значения лежат в репозитории.
-- Включил постоянное хранилище: Prometheus 10Gi, Alertmanager 2Gi. До этого метрики и
-  silences терялись при каждом перезапуске пода.
-- Настроил маршрутизацию алертов (`AlertmanagerConfig`) и доставку в Telegram: токен бота
-  лежит в SealedSecret, а не в репозитории, и доставку я проверил тестовым алертом.
-- Вывел Alertmanager и Grafana наружу через Traefik с сертификатами от cert-manager.
-- Перенёс платформенную обвязку под GitOps: cert-manager, Sealed Secrets и External Secrets
-  тоже ставятся ArgoCD из публичных чартов с пинованными версиями, а не руками через helm.
-- Закрыл сеть и в monitoring: `default-deny` плюс разрешения только на нужные потоки
-  (Prometheus скрейпит кластер, Grafana и Alertmanager ходят только к своим датасорсам
-  и приёмнику уведомлений).
-- Заменил трассировку: снёс Jaeger (archive, и спаны в него не шли по-настоящему) и поставил
-  Tempo из git, с трассами на диске, метриками в Prometheus и датасорсом в Grafana.
+SSH-ключ не доезжал до машин. Proxmox умеет добавлять ключ сам, но только к своему варианту user-data, а свой конфиг полностью его заменяет. Пришлось прописать `ssh_authorized_keys` внутри cloud-init.
 
----
+API кластера отвечал таймаутом при живом железе. Control plane стоял на 2 ГБ памяти, k3s занял её всю. Поднял до 4 ГБ. Отдельная тонкость: провайдер Proxmox не меняет память работающей машине, для этого нужен `reboot_after_update = true`.
+
+CRD ApplicationSet не создавался вообще. Манифест весит больше 256 КБ, а клиентский `kubectl apply` такие объекты не пропускает и падает на аннотации. Спасает `--server-side=true`.
+
+Агента трассировки не было в подах приложения. Приложение работало, трасс в Tempo не было ни одной. Поды стартовали раньше, чем ArgoCD создал объект Instrumentation, а оператор правит только новые поды. Помог перезапуск деплоймента. Правильнее разводить их по волнам синхронизации, но это я ещё не сделал.
+
+Имена на `.local` не резолвились. Прошёл весь путь от hosts до nsswitch: в `mdns_minimal [NOTFOUND=return]` стоит остановка поиска, и любой запрос на `.local` уходит в multicast DNS, до файла hosts дело не доходит. Сейчас там порядок с `files` впереди, но по-хорошему от `.local` надо уходить, стандарт отдаёт этот домен под локальное обнаружение.
 
 ## Что можно улучшить
 
-- Чарт `grafana/tempo` помечен как deprecated, хотя сам Tempo свежий (2.9.0). Если понадобится
-  микросервисный режим, есть `tempo-distributed` или оператор Tempo.
-- Образы пока в публичном Docker Hub; можно перейти на yandex container registry со сканированием уязвимостей.
-- Добавить тесты и проверку кода в CI.
-- Добавить получателей на разные каналы: сейчас всё уходит в один чат Telegram.
+Control plane один. Для домашнего стенда это компромисс: упавший узел роняет API, кворума нет.
 
----
+Версии не закреплены. ArgoCD и чарты ставятся по `latest` и `stable`, при переустановке приедет непонятно что. Теги стоит зафиксировать.
+
+Образы тянутся с Docker Hub. Для приватного реестра нужен imagePullSecret, я это не делал.
+
+История короткая. Prometheus хранит метрики десять дней, Tempo трассы трое суток. Для длинного хранения нужен внешний объектный бакет.
+
+Проверки здоровья пишутся в трассы наравне с рабочими запросами, шума много. Фильтр не настроен.
+
+Мелочи: chatID бота Telegram лежит в манифесте, его место в Secret. В CI адрес бота написан с опечаткой, руки не дошли. Файл `coredns-lan.yaml` остался с тех времён, когда VPN на ноутбуке перехватывал DNS внутри кластера, сейчас его можно убрать.
 
 ## Структура репозитория
 
 ```
-mood-app/
-├── apps/
-│   ├── frontend/
-│   │   ├── app.py                     # сайт: форма, /metrics, история в Redis
-│   │   ├── Dockerfile                 # multi-stage + distroless
-│   │   └── requirements.txt
-│   └── analytics/
-│       ├── app.py                     # POST /analyze, GET /healthz
-│       ├── Dockerfile
-│       └── requirements.txt
-│
-├── deploy/
-│   ├── mood-app/                      # Helm-чарт приложения
-│   │   ├── Chart.yaml
-│   │   ├── values.yaml                # версии образов (их обновляет CI/CD)
-│   │   ├── .helmignore
-│   │   └── templates/
-│   │       ├── frontend.yaml          # Deployment + Service
-│   │       ├── analytics.yaml
-│   │       ├── redis.yaml
-│   │       ├── ingress.yaml           # HTTPS + редирект с http
-│   │       ├── middleware-ratelimit.yaml
-│   │       ├── hpa-frontend.yaml      # автомасштабирование
-│   │       ├── hpa-analytics.yaml
-│   │       ├── network-policy-default-deny.yaml  # запрет всего + DNS
-│   │       ├── network-policy-frontend.yaml      # кто кого видит
-│   │       ├── network-policy-analytics.yaml
-│   │       └── network-policy-redis.yaml
-│   │
-│   └── system/
-│       ├── argocd/
-│       │   ├── root-app.yaml          # ← ТОЧКА ВХОДА В КЛАСТЕР
-│       │   └── apps/
-│       │       ├── app-mood.yaml       # приложение
-│       │       ├── app-secrets.yaml    # секреты
-│       │       ├── app-monitoring.yaml # метрики, алерты, TLS
-│       │       ├── app-platform.yaml   # pod security standards
-│       │       ├── app-kube-prometheus.yaml    # мониторинг (пинованная версия чарта)
-│       │       ├── app-cert-manager.yaml       # сертификаты
-│       │       ├── app-sealed-secrets.yaml     # расшифровка секретов
-│       │       ├── app-external-secrets.yaml   # секреты из облака
-│       │       ├── app-tempo.yaml              # трассировка (Tempo)
-│       │       ├── app-otel-operator.yaml      # оператор OpenTelemetry
-│       │       ├── repo-prometheus-community.yaml  # подключение helm-репозиториев
-│       │       ├── repo-grafana.yaml
-│       │       ├── repo-open-telemetry.yaml
-│       │       ├── repo-cert-manager.yaml
-│       │       ├── repo-sealed-secrets.yaml
-│       │       └── repo-external-secrets.yaml
-│       ├── helm/                      # значения чартов обвязки
-│       │   ├── cert-manager.yaml
-│       │   ├── sealed-secrets.yaml
-│       │   ├── external-secrets.yaml
-│       │   ├── tempo.yaml
-│       │   └── opentelemetry-operator.yaml
-│       ├── kube-prometheus/
-│       │   └── values.yaml            # значения чарта мониторинга
-│       ├── monitoring/
-│       │   ├── service-monitor.yaml          # Prometheus забирает /metrics
-│       │   ├── alertmanager-config.yaml      # куда отправлять алерты
-│       │   ├── telegram-bot-sealed-secret.yaml # токен бота Telegram
-│       │   ├── ingress.yaml                  # UI Alertmanager и Grafana по HTTPS
-│       │   ├── network-policy-monitoring.yaml # кто кого видит в monitoring
-│       │   ├── instrumentation.yaml          # настройки агента для приложения
-│       │   ├── grafana-admin-sealed-secret.yaml # пароль Grafana
-│       │   └── issuer.yaml                   # самоподписанный центр сертификатов
-│       ├── platform/
-│       │   ├── namespace-default.yaml  # pod security standards
-│       │   └── coredns-lan.yaml        # DNS кластера для VPN на localhost:30053
-│       └── external-secrets/
-│           ├── secret-store.yaml      # подключение к Yandex Cloud Lockbox
-│           ├── external-secret.yaml   # тянет пароль Redis
-│           └── yc-sealed-secret.yaml  # доступ к облаку
-│
-├── docs/
-│   └── jaeger-ui.png                  # скриншот старой трассировки, оставлен на память
-│
-├── .github/workflows/
-│   └── ci-cd.yml                      # сборка образов + обновление версий
-│
-├── docker-compose.yml                 # локальный запуск
-├── .env                               # пароль локально (в .gitignore)
-├── .gitignore
-└── README.md
+apps/
+  frontend/            FastAPI, страница, история из Redis, вызов аналитики
+  analytics/           FastAPI, длина текста и настроение
+deploy/
+  mood-app/            Helm-чарт приложения, включая HPA и NetworkPolicy
+  system/
+    argocd/            root-app.yaml и манифесты десяти приложений
+    helm/              values для cert-manager, Tempo, оператора OTel, Sealed Secrets
+    kube-prometheus/   values для стека мониторинга
+    monitoring/        ingress, issuer, AlertmanagerConfig, ServiceMonitor, Instrumentation
+    platform/          namespace и coredns-lan
+    secrets/           зашифрованные пароли
+docs/                  скриншот приложения
+terraform/proxmox/     создание трёх виртуалок и установка k3s через cloud-init
+.github/workflows/     сборка образов и обновление тегов
 ```
+
+## Почему Proxmox
+
+Стенд начинался в Yandex Cloud и пережил там аварию дата-центра. В VK Cloud упёрся в квоты: ноль плавающих адресов, ноль балансировщиков, ноль портов во внешней сети. Тогда я поднял Proxmox на домашнем железе и перенёс кластер туда.
+
+Код для обоих облаков остался в истории коммитов, в актуальной ветке лежит только Proxmox.
