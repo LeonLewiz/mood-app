@@ -100,5 +100,7 @@ resource "proxmox_virtual_environment_vm" "k3s" {
     type = "l26"
   }
 
+  reboot_after_update = true
+
   started = true
 }

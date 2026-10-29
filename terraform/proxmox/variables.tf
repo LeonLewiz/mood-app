@@ -63,7 +63,7 @@ variable "nodes" {
       address = "192.168.3.151/24"
       mac     = "bc:24:11:00:00:51"
       cores   = 2
-      memory  = 2048
+      memory  = 4096
       disk    = 15
       role    = "server"
     }
@@ -71,7 +71,7 @@ variable "nodes" {
       address = "192.168.3.152/24"
       mac     = "bc:24:11:00:00:52"
       cores   = 2
-      memory  = 4096
+      memory  = 3072
       disk    = 20
       role    = "agent"
     }
