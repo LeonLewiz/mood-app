@@ -10,6 +10,6 @@ spec:
     matchLabels:
       app: mood-frontend
   endpoints:
-  - port: web 
-    path: /metrics
-    interval: 15s
+    - port: web
+      path: /metrics
+      interval: 15s
