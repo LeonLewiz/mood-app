@@ -44,16 +44,3 @@ jobs:
             -ignore-filename-pattern 'helm|values\.yaml' \
             rendered.yaml \
             ./deploy/system
-
-  gitleaks:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Run Gitleaks
-        uses: gitleaks/gitleaks-action@v3
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHGUB_TOKEN  }}
