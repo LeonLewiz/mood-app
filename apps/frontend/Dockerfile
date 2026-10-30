@@ -14,7 +14,7 @@ FROM gcr.io/distroless/python3-debian12:nonroot AS final
 WORKDIR /app
 
 # Copy local libs
-COPY --from=builder /root/.local /home/nonroot/.local
+COPYERRORLINTCHECK!! --from=builder /root/.local /home/nonroot/.local
 ENV PYTHONPATH=/usr/local/lib/python3.11/site-packages
 ENV PATH=/home/nonroot/.local/bin:$PATH
 
