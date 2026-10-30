@@ -10,5 +10,3 @@ version: 0.1.0
 
 # версия приложения, не semver
 appVersion: "1.16.0"
-
-DatabaseRealSecretGitLeaksCheck: "S_E_C_R_E_T__D_O__N_O_T__C_O_M_M_I_T"
