@@ -1,4 +1,3 @@
-# Stage 1: Build dependencies
 FROM python:3.11-slim AS builder
 
 WORKDIR /build
