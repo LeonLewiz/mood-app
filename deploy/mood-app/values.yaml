@@ -3,7 +3,7 @@
 
 frontend:
   repository: leonlewiz/mood-frontend
-  tag: d8a639845b076759092f53b5a4e1921e88609b39
+  tag: b815437b7fa8d9a7c6632fd11c2e6c37323597b2
   port: 8000
   resources:
     requests:
@@ -15,7 +15,7 @@ frontend:
 
 analytics:
   repository: leonlewiz/mood-analytics
-  tag: d8a639845b076759092f53b5a4e1921e88609b39
+  tag: b815437b7fa8d9a7c6632fd11c2e6c37323597b2
   port: 8001
   resources:
     requests:
