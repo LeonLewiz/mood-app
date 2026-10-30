@@ -32,7 +32,7 @@ metadata:
   name: grafana
   namespace: monitoring
   annotations:
-    cert-manager.io/cluster-issuer: local-selfsigned-issuer
+                         cert-manager.io/cluster-issuer: local-selfsigned-issuer
     ingress.kubernetes.io/ssl-redirect: "true"
 spec:
   ingressClassName: traefik
