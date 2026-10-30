@@ -16,3 +16,4 @@ spec:
     automated:
       prune: true
       selfHeal: true
+      broke for kubeconform: absolutely true
