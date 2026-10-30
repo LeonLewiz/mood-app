@@ -17,6 +17,10 @@ variable "image_datastore_id" {
   type    = string
   default = "local"
 }
+variable "imasdsaage_datastore_id" {
+  type    = string
+  default = "local"
+}
 
 variable "bridge" {
   type    = string
