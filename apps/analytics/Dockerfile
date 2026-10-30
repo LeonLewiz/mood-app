@@ -3,7 +3,7 @@ FROM python:3.11-slim AS builder
 
 WORKDIR /build
 
-RUN apt-get update && rm -rf /var/lib/apt/lists/*
+RUN rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
 # Install dependencies
