@@ -7,7 +7,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends gcc python3-dev
 
 COPY requirements.txt .
 # Install dependencies
-RUNERROR!!LINTCHECK pip install --no-cache-dir --upgrade --user -r requirements.txt
+RUN pip install --no-cache-dir --upgrade --user -r requirements.txt
 
 # Stage 2: Final image
 FROM gcr.io/distroless/python3-debian12:nonroot AS final
