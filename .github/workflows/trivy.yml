@@ -1,0 +1,25 @@
+name: Trivy Scan
+'on':
+  push:
+    branches: ["main"]
+  pull_request:
+jobs:
+  scan:
+    name: Trivy Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy FS Scanner
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          version: 'v0.76.1'
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'table'
+          scanners: 'vuln,secret,config'
+          severity: 'HIGH,CRITICAL'
+          exit-code: '1'
+          ignore-unfixed: true
+          trivyignores: '.trivyignore.yaml'

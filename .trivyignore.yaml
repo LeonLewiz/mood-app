@@ -1,0 +1,24 @@
+misconfigurations:
+  - id: DS-0002
+    paths:
+      - "apps/analytics/Dockerfile"
+      - "apps/frontend/Dockerfile"
+    statement: "финальный образ distroless уже работает под пользователем nonroot"
+
+  - id: DS-0026
+    paths:
+      - "apps/analytics/Dockerfile"
+      - "apps/frontend/Dockerfile"
+    statement: "пробы описаны в манифесте, HEALTHCHECK в образе Kubernetes не читает"
+
+  - id: KSV-0013
+    paths:
+      - "deploy/mood-app/templates/analytics.yaml"
+      - "deploy/mood-app/templates/frontend.yaml"
+    statement: "тег образа подставляет CI по SHA коммита, дефолт в кластер не попадает"
+
+  - id: KSV-0125
+    paths:
+      - "deploy/mood-app/templates/analytics.yaml"
+      - "deploy/mood-app/templates/frontend.yaml"
+    statement: "образы собирает мой CI и лежат в моём аккаунте Docker Hub, свой реестр в планах"
