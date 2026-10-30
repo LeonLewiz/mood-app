@@ -1,3 +1,4 @@
+---
 apiVersion: v2
 name: mood-app
 description: A Helm chart for Kubernetes
