@@ -35,14 +35,12 @@ jobs:
         run: helm template mood-app deploy/mood-app > rendered.yaml
 
       - name: Validate manifests
-        uses: docker://ghcr.io/yannh/kubeconform:v0.8.0-alpine
-        with:
-          entrypoint: '/kubeconform'
-          args: >-
-            -summary
-            -ignore-missing-schemas
-            -schema-location default
-            -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json'
-            -ignore-filename-pattern 'helm|values\.yaml'
-            rendered.yaml
+        run: |
+          docker run --rm -v "$PWD:/work" -w /work ghcr.io/yannh/kubeconform:v0.8.0-alpine \
+            -summary \
+            -ignore-missing-schemas \
+            -schema-location default \
+            -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+            -ignore-filename-pattern 'helm|values\.yaml' \
+            rendered.yaml \
             ./deploy/system
