@@ -6,7 +6,7 @@ name: CI/CD (Build & GitOps)
     paths:
       - "apps/**"
 
-jobs:
+jobsERRORFORLINTER:
   build-and-deploy:
     runs-on: ubuntu-latest
     steps:
