@@ -1,24 +1,24 @@
-# Stage 1: Build dependencies
 FROM python:3.11-slim AS builder
 
 WORKDIR /build
 
-RUN rm -rf /var/lib/apt/lists/*
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir --upgrade --user -r requirements.txt
+RUN pip install --no-cache-dir --upgrade -r requirements.txt
+
 FROM gcr.io/distroless/python3-debian12:nonroot AS final
 
 WORKDIR /app
 
-# Copy local libs
-COPY --from=builder /root/.local /home/nonroot/.local
-ENV PYTHONPATH=/usr/local/lib/python3.11/site-packages
-ENV PATH=/home/nonroot/.local/bin:$PATH
+COPY --from=builder /opt/venv /opt/venv
 
+ENV PATH="/opt/venv/bin:$PATH"
+ENV PYTHONPATH="/opt/venv/lib/python3.11/site-packages"
 
 COPY . .
 
 EXPOSE 8000
 
-CMD ["app.py"]
+CMD ["/opt/venv/bin/python", "app.py"]
