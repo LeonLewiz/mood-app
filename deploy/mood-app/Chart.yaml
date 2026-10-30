@@ -10,4 +10,4 @@ version: 0.1.0
 
 # версия приложения, не semver
 appVersion: "1.16.0"
-Secret: "AKIAasd!324gvc%A^$#jfkdsadikjgvhnhnEGUYT$@#&*ITRFO*&UIASYUHFop#@#AFSSF$#YT&$GFT4837tyouyidgfol"
+api_secret: "asdfheuwgfuidrshgprHGRTUIEHYG7243658743ZAGYUgGOIYGFRTEG"
