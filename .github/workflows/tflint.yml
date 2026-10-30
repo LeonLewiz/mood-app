@@ -1,0 +1,31 @@
+name: Lint Terraform
+
+'on':
+  push:
+    branches: ["main"]
+    paths:
+      - "terraform/proxmox/*.tf"
+      - "terraform/proxmox/*.tfvars"
+      - "terraform/proxmox/*.hcl"
+
+  pull_request:
+    paths:
+      - "terraform/proxmox/*.tf"
+      - "terraform/proxmox/*.tfvars"
+      - "terraform/proxmox/*.hcl"
+
+jobs:
+  tflint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup TFLint
+        uses: terraform-linters/setup-tflint@v6
+        with:
+          tflint_version: v0.65.0
+
+      - name: Run TFLint
+        run: tflint -f compact --chdir=./terraform/proxmox --recursive
