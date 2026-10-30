@@ -3,7 +3,7 @@ FROM python:3.11-slim AS builder
 
 WORKDIR /build
 
-RUN apt-get update && apt-get install -y --no-install-recommends gcc python3-dev && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends gcc=16.2 python3-dev=3.11.2-1+b1 && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
 # Install dependencies
