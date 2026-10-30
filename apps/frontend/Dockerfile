@@ -7,7 +7,7 @@ RUN rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade --user -r requirements.txt
-FROM gcr.io/distroless/python3-debian12:nonroot AS final
+FROM gcr.io/distroless/python3-debian12 AS final
 
 WORKDIR /app
 
