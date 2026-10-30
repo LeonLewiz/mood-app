@@ -6,9 +6,7 @@ WORKDIR /build
 RUN rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
-# Install dependencies
 RUN pip install --no-cache-dir --upgrade --user -r requirements.txt
-# Stage 2: Final image
 FROM gcr.io/distroless/python3-debian12:nonroot AS final
 
 WORKDIR /app
