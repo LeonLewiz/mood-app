@@ -1,4 +1,10 @@
 misconfigurations:
+  - id: DS-0002
+    paths:
+      - "apps/analytics/Dockerfile"
+      - "apps/frontend/Dockerfile"
+    statement: "финальный образ distroless уже работает под пользователем nonroot"
+
   - id: DS-0026
     paths:
       - "apps/analytics/Dockerfile"
